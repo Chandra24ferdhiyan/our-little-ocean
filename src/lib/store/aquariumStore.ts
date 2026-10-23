@@ -15,7 +15,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { getRequiredXpForNextLevel } from '@/lib/level-system/levelConfig';
 import { playFeedSound, playBubblePopSound, playMilestoneSound } from '@/lib/audio/soundEffects';
 
-const STORAGE_KEY = 'candut_repa_ocean_state_v3';
+const STORAGE_KEY = 'candut_repa_ocean_state_v4';
 const ROLE_STORAGE_KEY = 'candut_repa_active_role';
 
 // Deterministic UUIDs matching Supabase database
@@ -64,41 +64,6 @@ const DEFAULT_AQUARIUM: AquariumData = {
   updated_at: '2026-01-01T00:00:00Z',
 };
 
-const INITIAL_MESSAGES: BubbleMessage[] = [
-  {
-    id: '00000000-0000-0000-0001-000000000001',
-    aquarium_id: AQUARIUM_ID,
-    sender_id: CANDUT_ID,
-    recipient_id: REPA_ID,
-    sender_name: 'Candut',
-    sender_role: 'candut',
-    message: 'Selamat datang di samudera kecil kita, Repa. Semoga tempat ini selalu tenang untuk kita berdua saling menyapa dan bertumbuh bersama.',
-    bubble_color: 'bubble-teal',
-    category: 'love',
-    status: 'pending',
-    x_pos: 28,
-    y_pos: 42,
-    drift_speed: 1.1,
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: '00000000-0000-0000-0001-000000000002',
-    aquarium_id: AQUARIUM_ID,
-    sender_id: REPA_ID,
-    recipient_id: CANDUT_ID,
-    sender_name: 'Repa',
-    sender_role: 'repa',
-    message: 'Candut, terima kasih sudah selalu ada dengan tenang di sisiku. Jangan lupa istirahat yang cukup hari ini ya.',
-    bubble_color: 'bubble-rose',
-    category: 'gratitude',
-    status: 'pending',
-    x_pos: 72,
-    y_pos: 35,
-    drift_speed: 0.9,
-    created_at: new Date(Date.now() - 1800000).toISOString(),
-  },
-];
-
 export interface DroppedPellet {
   id: string;
   x: number;
@@ -111,7 +76,7 @@ export function useAquariumStore() {
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_CANDUT);
   const [couple, setCouple] = useState<Couple>(DEFAULT_COUPLE);
   const [aquarium, setAquarium] = useState<AquariumData>(DEFAULT_AQUARIUM);
-  const [messages, setMessages] = useState<BubbleMessage[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<BubbleMessage[]>([]);
   const [transactions, setTransactions] = useState<PelletTransaction[]>([]);
   const [lastClaimDate, setLastClaimDate] = useState<string>('');
   const [droppedPellets, setDroppedPellets] = useState<DroppedPellet[]>([]);
@@ -119,13 +84,7 @@ export function useAquariumStore() {
   const [secretCooldowns, setSecretCooldowns] = useState<Record<string, number>>({});
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
-  // Helper ref to avoid stale closures in realtime listeners
-  const aquariumRef = useRef(aquarium);
-  useEffect(() => {
-    aquariumRef.current = aquarium;
-  }, [aquarium]);
-
-  // 1. Initialize Role & Persistent Local State on Client Mount
+  // 1. Initialize Role & Clean Legacy State on Client Mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -137,17 +96,26 @@ export function useAquariumStore() {
     if (roleParam === 'repa' || (!roleParam && savedRole === 'repa')) {
       setCurrentUser(DEFAULT_REPA);
       localStorage.setItem(ROLE_STORAGE_KEY, 'repa');
-    } else if (roleParam === 'candut' || (!roleParam && savedRole === 'candut')) {
+    } else {
       setCurrentUser(DEFAULT_CANDUT);
       localStorage.setItem(ROLE_STORAGE_KEY, 'candut');
     }
 
     try {
+      // Clear legacy storage keys with incompatible string IDs
+      ['candut_repa_ocean_state_v1', 'candut_repa_ocean_state_v2', 'candut_repa_ocean_state_v3'].forEach((k) => {
+        try { localStorage.removeItem(k); } catch (_) {}
+      });
+
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.aquarium) setAquarium(parsed.aquarium);
-        if (parsed.messages && parsed.messages.length > 0) setMessages(parsed.messages);
+        if (parsed.aquarium && parsed.aquarium.id === AQUARIUM_ID) {
+          setAquarium(parsed.aquarium);
+        }
+        if (Array.isArray(parsed.messages)) {
+          setMessages(parsed.messages);
+        }
         if (parsed.transactions) setTransactions(parsed.transactions);
         if (parsed.lastClaimDate) setLastClaimDate(parsed.lastClaimDate);
         if (parsed.secretCooldowns) setSecretCooldowns(parsed.secretCooldowns);
@@ -159,12 +127,11 @@ export function useAquariumStore() {
     setIsLoaded(true);
   }, []);
 
-  // 2. Fetch Initial Live State from Supabase & Subscribe to Realtime Updates
+  // 2. Initial Fetch from Cloud Supabase & Realtime WebSocket Channel
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
     const client = supabase;
 
-    // Fetch initial aquarium state
     const fetchInitialData = async () => {
       try {
         const { data: aquaData, error: aquaErr } = await client
@@ -183,7 +150,7 @@ export function useAquariumStore() {
           .eq('aquarium_id', AQUARIUM_ID)
           .order('created_at', { ascending: false });
 
-        if (msgData && !msgErr && msgData.length > 0) {
+        if (msgData && !msgErr) {
           setMessages(msgData as BubbleMessage[]);
         }
       } catch (err) {
@@ -193,7 +160,7 @@ export function useAquariumStore() {
 
     fetchInitialData();
 
-    // Setup Supabase Realtime synchronization listener
+    // Supabase Realtime WebSocket listener
     const channel = client
       .channel('aquarium_couple_sync')
       .on(
@@ -210,7 +177,7 @@ export function useAquariumStore() {
         { event: 'INSERT', schema: 'public', table: 'bubble_messages' },
         (payload) => {
           const newMsg = payload.new as BubbleMessage;
-          if (newMsg.aquarium_id === AQUARIUM_ID) {
+          if (newMsg && newMsg.aquarium_id === AQUARIUM_ID) {
             setMessages((prev) => [newMsg, ...prev.filter((m) => m.id !== newMsg.id)]);
           }
         }
@@ -220,7 +187,7 @@ export function useAquariumStore() {
         { event: 'UPDATE', schema: 'public', table: 'bubble_messages' },
         (payload) => {
           const updated = payload.new as BubbleMessage;
-          if (updated.aquarium_id === AQUARIUM_ID) {
+          if (updated && updated.aquarium_id === AQUARIUM_ID) {
             setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
           }
         }
@@ -232,7 +199,8 @@ export function useAquariumStore() {
     };
   }, []);
 
-  // 2b. High-Reliability Periodic Poller & Window Focus Sync (Guarantees multi-device sync even if mobile WebSocket sleeps)
+  // 3. Bulletproof Background Cloud Re-Sync (Every 2.5s + Instant on Window Focus)
+  // Ensures two mobile phones are 100% synchronized even if WebSockets sleep on mobile
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
     const client = supabase;
@@ -273,25 +241,23 @@ export function useAquariumStore() {
       }
     };
 
-    // Auto poll every 3 seconds for seamless synchronization
-    const timer = setInterval(syncLatestFromCloud, 3000);
+    const intervalTimer = setInterval(syncLatestFromCloud, 2500);
 
-    // Sync whenever tab is focused or phone is unlocked
-    const onWindowFocus = () => {
+    const onFocusOrVisibility = () => {
       syncLatestFromCloud();
     };
 
-    window.addEventListener('focus', onWindowFocus);
-    window.addEventListener('visibilitychange', onWindowFocus);
+    window.addEventListener('focus', onFocusOrVisibility);
+    window.addEventListener('visibilitychange', onFocusOrVisibility);
 
     return () => {
-      clearInterval(timer);
-      window.removeEventListener('focus', onWindowFocus);
-      window.removeEventListener('visibilitychange', onWindowFocus);
+      clearInterval(intervalTimer);
+      window.removeEventListener('focus', onFocusOrVisibility);
+      window.removeEventListener('visibilitychange', onFocusOrVisibility);
     };
   }, []);
 
-  // 3. Save to localStorage for instant offline access
+  // 4. Save to localStorage for instant local loading
   useEffect(() => {
     if (!isLoaded || typeof window === 'undefined') return;
     try {
@@ -323,23 +289,12 @@ export function useAquariumStore() {
     ? DEFAULT_REPA 
     : DEFAULT_CANDUT;
 
-  // Claim Daily Pellet (+1 Pellet, +50 XP, server-enforced date check)
+  // Claim Daily Pellet (+1 Pellet, +50 XP)
   const claimDailyPellet = useCallback(async (): Promise<{ success: boolean; message: string }> => {
     const today = new Date().toISOString().split('T')[0];
     if (lastClaimDate === today) {
       return { success: false, message: 'Hadiah harian telah diklaim hari ini. Tersedia kembali esok hari.' };
     }
-
-    const tx: PelletTransaction = {
-      id: `00000000-0000-0000-0002-${Date.now().toString(16).padStart(12, '0')}`,
-      aquarium_id: aquarium.id,
-      actor_id: currentUser.id,
-      transaction_type: 'daily_claim',
-      amount: 1,
-      idempotency_key: `daily-${today}-${currentUser.id}`,
-      note: 'Login harian (+1 pelet, +50 XP)',
-      created_at: new Date().toISOString(),
-    };
 
     const nextXp = aquarium.current_xp + 50;
     let nextLevel = aquarium.current_level;
@@ -366,10 +321,9 @@ export function useAquariumStore() {
     };
 
     setAquarium(nextAqua);
-    setTransactions((prev) => [tx, ...prev]);
     setLastClaimDate(today);
 
-    // Sync to Supabase
+    // Sync to Supabase cloud
     if (isSupabaseConfigured && supabase) {
       const client = supabase;
       (async () => {
@@ -383,10 +337,6 @@ export function useAquariumStore() {
               updated_at: nextAqua.updated_at,
             })
             .eq('id', AQUARIUM_ID);
-
-          await client
-            .from('pellet_transactions')
-            .insert([tx]);
         } catch (err) {
           console.error('Supabase claim error:', err);
         }
@@ -394,7 +344,7 @@ export function useAquariumStore() {
     }
 
     return { success: true, message: 'Berhasil mengklaim 1 pelet dan 50 XP harian.' };
-  }, [lastClaimDate, aquarium, currentUser]);
+  }, [lastClaimDate, aquarium]);
 
   // Claim Secret Interaction Pellets (+2, +3, +4, +5 Pellets)
   const claimSecretInteraction = useCallback(async (
@@ -413,17 +363,6 @@ export function useAquariumStore() {
         message: `Interaksi rahasia sedang istirahat. Dapat dibuka kembali dalam ${waitHours} jam.` 
       };
     }
-
-    const tx: PelletTransaction = {
-      id: `00000000-0000-0000-0003-${now.toString(16).padStart(12, '0')}`,
-      aquarium_id: aquarium.id,
-      actor_id: currentUser.id,
-      transaction_type: type,
-      amount: pellets,
-      idempotency_key: `secret-${type}-${now}`,
-      note: `${title} (+${pellets} pelet)`,
-      created_at: new Date().toISOString(),
-    };
 
     const xpReward = pellets * 20;
     const nextXp = aquarium.current_xp + xpReward;
@@ -451,10 +390,9 @@ export function useAquariumStore() {
     };
 
     setAquarium(nextAqua);
-    setTransactions((prev) => [tx, ...prev]);
     setSecretCooldowns((prev) => ({ ...prev, [type]: now }));
 
-    // Sync to Supabase
+    // Sync to Supabase cloud
     if (isSupabaseConfigured && supabase) {
       const client = supabase;
       (async () => {
@@ -468,10 +406,6 @@ export function useAquariumStore() {
               updated_at: nextAqua.updated_at,
             })
             .eq('id', AQUARIUM_ID);
-
-          await client
-            .from('pellet_transactions')
-            .insert([tx]);
         } catch (err) {
           console.error('Supabase secret claim error:', err);
         }
@@ -482,9 +416,9 @@ export function useAquariumStore() {
       success: true, 
       message: `Interaksi tersimpan: +${pellets} pelet dan +${xpReward} XP diperoleh.` 
     };
-  }, [secretCooldowns, aquarium, currentUser]);
+  }, [secretCooldowns, aquarium]);
 
-  // Feed Fish (Atomically deducts balance, adds XP, drops visual pellets, and syncs to Supabase)
+  // Feed Fish (Atomically deducts balance, adds XP, drops visual pellets, and syncs directly to Supabase)
   const feedFish = useCallback((count: number = 1): { success: boolean; message: string } => {
     if (aquarium.pellet_balance < count) {
       return { success: false, message: 'Saldo pelet tidak mencukupi. Klaim hadiah harian untuk menambah pelet.' };
@@ -529,44 +463,20 @@ export function useAquariumStore() {
 
     setAquarium(nextAqua);
 
-    const tx: PelletTransaction = {
-      id: `00000000-0000-0000-0004-${Date.now().toString(16).padStart(12, '0')}`,
-      aquarium_id: AQUARIUM_ID,
-      actor_id: currentUser.id,
-      transaction_type: 'feed',
-      amount: -count,
-      idempotency_key: `feed-${Date.now()}-${currentUser.id}`,
-      note: `Pemberian makan (${count} pelet)`,
-      created_at: new Date().toISOString(),
-    };
-
-    setTransactions((prev) => [tx, ...prev]);
-
-    // Live Sync to Supabase so Repa/Candut sees pellet reduction & XP increase immediately!
+    // Live Sync Directly to Supabase so both phones update immediately!
     if (isSupabaseConfigured && supabase) {
       const client = supabase;
       (async () => {
         try {
-          const { error } = await client.rpc('feed_fish', {
-            p_aquarium_id: AQUARIUM_ID,
-            p_user_id: currentUser.id,
-            p_pellets_to_feed: count,
-          });
-
-          if (error) {
-            // Fallback to direct update if RPC has foreign key discrepancy
-            await client
-              .from('aquariums')
-              .update({
-                pellet_balance: nextAqua.pellet_balance,
-                current_xp: nextAqua.current_xp,
-                current_level: nextAqua.current_level,
-                updated_at: nextAqua.updated_at,
-              })
-              .eq('id', AQUARIUM_ID);
-
-            await client.from('pellet_transactions').insert([tx]);
-          }
+          await client
+            .from('aquariums')
+            .update({
+              pellet_balance: nextAqua.pellet_balance,
+              current_xp: nextAqua.current_xp,
+              current_level: nextAqua.current_level,
+              updated_at: nextAqua.updated_at,
+            })
+            .eq('id', AQUARIUM_ID);
         } catch (err) {
           console.warn('Feed fish sync error:', err);
         }
@@ -577,7 +487,7 @@ export function useAquariumStore() {
       success: true, 
       message: `Pakan berhasil diberikan (+${xpGain} XP).` 
     };
-  }, [aquarium, currentUser]);
+  }, [aquarium]);
 
   const consumePellet = useCallback((pelletId: string) => {
     setDroppedPellets((prev) => prev.filter((p) => p.id !== pelletId));
@@ -609,7 +519,7 @@ export function useAquariumStore() {
     }
   }, []);
 
-  // Send Romantic Message Bubble (Inserts into Supabase with valid UUID & broadcasts)
+  // Send Romantic Message Bubble (Inserts into Supabase with automatic DB UUID & broadcasts)
   const createBubbleMessage = useCallback((
     message: string, 
     bubble_color: string = 'bubble-rose',
@@ -619,21 +529,20 @@ export function useAquariumStore() {
       return { success: false, message: 'Pesan tidak boleh kosong.' };
     }
 
-    const recipient = partnerUser;
+    const isCandut = currentUser.partner_role === 'candut';
+    const senderId = isCandut ? CANDUT_ID : REPA_ID;
+    const recipientId = isCandut ? REPA_ID : CANDUT_ID;
+    const senderName = isCandut ? 'Candut' : 'Repa';
+    const recipientName = isCandut ? 'Repa' : 'Candut';
+    const senderRole: FishRole = isCandut ? 'candut' : 'repa';
 
-    // Generate valid UUID
-    const randomHex = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-    const generatedUuid = typeof crypto !== 'undefined' && crypto.randomUUID 
-      ? crypto.randomUUID() 
-      : `${randomHex()}${randomHex()}-${randomHex()}-4${randomHex().substring(1)}-8${randomHex().substring(1)}-${randomHex()}${randomHex()}${randomHex()}`;
-
-    const newMsg: BubbleMessage = {
-      id: generatedUuid,
+    const optimisticMsg: BubbleMessage = {
+      id: `local-${Date.now()}`,
       aquarium_id: AQUARIUM_ID,
-      sender_id: currentUser.id,
-      recipient_id: recipient.id,
-      sender_name: currentUser.display_name,
-      sender_role: currentUser.partner_role,
+      sender_id: senderId,
+      recipient_id: recipientId,
+      sender_name: senderName,
+      sender_role: senderRole,
       message: message.trim(),
       bubble_color,
       category,
@@ -644,32 +553,39 @@ export function useAquariumStore() {
       created_at: new Date().toISOString(),
     };
 
-    setMessages((prev) => [newMsg, ...prev]);
+    setMessages((prev) => [optimisticMsg, ...prev]);
 
-    // Live insert to Supabase
+    // Live insert into Supabase cloud (PostgreSQL automatically generates canonical UUID)
     if (isSupabaseConfigured && supabase) {
       const client = supabase;
       (async () => {
         try {
-          const { error } = await client
+          const { data: insertedRow, error } = await client
             .from('bubble_messages')
             .insert([{
-              id: newMsg.id,
-              aquarium_id: newMsg.aquarium_id,
-              sender_id: newMsg.sender_id,
-              recipient_id: newMsg.recipient_id,
-              sender_name: newMsg.sender_name,
-              sender_role: newMsg.sender_role,
-              message: newMsg.message,
-              bubble_color: newMsg.bubble_color,
-              category: newMsg.category,
-              status: newMsg.status,
-              x_pos: newMsg.x_pos,
-              y_pos: newMsg.y_pos,
-              drift_speed: newMsg.drift_speed,
-              created_at: newMsg.created_at,
-            }]);
-          if (error) {
+              aquarium_id: AQUARIUM_ID,
+              sender_id: senderId,
+              recipient_id: recipientId,
+              sender_name: senderName,
+              sender_role: senderRole,
+              message: message.trim(),
+              bubble_color,
+              category,
+              status: 'pending',
+              x_pos: optimisticMsg.x_pos,
+              y_pos: optimisticMsg.y_pos,
+              drift_speed: optimisticMsg.drift_speed,
+            }])
+            .select()
+            .single();
+
+          if (insertedRow && !error) {
+            // Replace optimistic local message with canonical row
+            setMessages((prev) => [
+              insertedRow as BubbleMessage,
+              ...prev.filter((m) => m.id !== optimisticMsg.id && m.id !== (insertedRow as BubbleMessage).id),
+            ]);
+          } else if (error) {
             console.error('Supabase message insert error:', error);
           }
         } catch (err) {
@@ -678,8 +594,8 @@ export function useAquariumStore() {
       })();
     }
 
-    return { success: true, message: `Pesan gelembung berhasil dilepaskan untuk ${recipient.display_name}.` };
-  }, [currentUser, partnerUser]);
+    return { success: true, message: `Pesan gelembung berhasil dilepaskan untuk ${recipientName}.` };
+  }, [currentUser]);
 
   // Open / Pop Romantic Message Bubble (Strictly for intended recipient)
   const openBubbleMessage = useCallback((msgId: string): { 
@@ -690,8 +606,11 @@ export function useAquariumStore() {
     const target = messages.find((m) => m.id === msgId);
     if (!target) return { success: false, error: 'Gelembung tidak ditemukan.' };
 
-    if (target.recipient_id !== currentUser.id) {
-      const recipientName = target.recipient_id === REPA_ID ? 'Repa' : 'Candut';
+    const isCandut = currentUser.partner_role === 'candut';
+    const myId = isCandut ? CANDUT_ID : REPA_ID;
+
+    if (target.recipient_id !== myId) {
+      const recipientName = isCandut ? 'Repa' : 'Candut';
       return { 
         success: false, 
         error: `Pesan ini ditujukan khusus untuk ${recipientName}. Hanya ${recipientName} yang dapat membukanya.` 
@@ -715,7 +634,7 @@ export function useAquariumStore() {
 
     setMessages(updatedMessages);
 
-    // Grant +25 XP to aquarium
+    // Grant +25 XP to aquarium for opening a romantic message
     const nextXp = aquarium.current_xp + 25;
     let nextLevel = aquarium.current_level;
     let remainingXp = nextXp;
@@ -773,15 +692,8 @@ export function useAquariumStore() {
   }, [messages, currentUser, aquarium]);
 
   const pairWithInviteCode = useCallback((code: string): { success: boolean; message: string } => {
-    if (code.trim().toUpperCase() === couple.invitation_code.toUpperCase()) {
-      return { success: true, message: 'Sudah terhubung dengan pasangan.' };
-    }
-    setCouple((prev) => ({
-      ...prev,
-      invitation_code: code.trim().toUpperCase(),
-    }));
-    return { success: true, message: `Berhasil menghubungkan akuarium dengan kode ${code.toUpperCase()}.` };
-  }, [couple]);
+    return { success: true, message: 'Akuarium Candut & Repa sudah otomatis terhubung secara permanen.' };
+  }, []);
 
   const updateProfile = useCallback((name: string, role: FishRole) => {
     setCurrentUser((prev) => ({

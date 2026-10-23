@@ -22,24 +22,13 @@ interface CoupleModalProps {
 export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
   const { 
     currentUser, 
-    couple, 
     aquarium,
-    switchPartner, 
-    pairWithInviteCode 
+    switchPartner 
   } = useAquarium();
 
-  const [partnerCodeInput, setPartnerCodeInput] = useState('');
-  const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState<'candut' | 'repa' | null>(null);
-  const [feedback, setFeedback] = useState<{ success: boolean; msg: string } | null>(null);
 
   if (!isOpen) return null;
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(couple.invitation_code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleCopyLink = (role: 'candut' | 'repa') => {
     if (typeof window === 'undefined') return;
@@ -47,14 +36,6 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
     navigator.clipboard.writeText(url);
     setCopiedLink(role);
     setTimeout(() => setCopiedLink(null), 2500);
-  };
-
-  const handlePair = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!partnerCodeInput.trim()) return;
-    const res = pairWithInviteCode(partnerCodeInput);
-    setFeedback({ success: res.success, msg: res.message });
-    setTimeout(() => setFeedback(null), 3000);
   };
 
   return (
@@ -182,55 +163,18 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
           </div>
         </div>
 
-        {/* Invitation Code */}
-        <div className="mt-4 p-4 rounded-xl bg-[#F8FAFC] border border-[#E2EAF0]">
-          <label className="block text-xs font-semibold text-[#182C3A] mb-1.5">
-            Kode Undangan Akuarium
-          </label>
-          <div className="flex items-center space-x-2">
-            <div className="flex-1 px-3 py-2 bg-white border border-[#CBD7DF] rounded-lg font-mono text-sm font-bold text-[#4A6B82] tracking-wider">
-              {couple.invitation_code}
-            </div>
-            <button
-              onClick={handleCopyCode}
-              className="px-3.5 py-2 rounded-lg bg-white hover:bg-[#F4F7F9] text-[#182C3A] border border-[#CBD7DF] flex items-center space-x-1.5 text-xs font-semibold transition shadow-2xs"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-[#4A6B82]" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Tersalin' : 'Salin'}</span>
-            </button>
+        {/* Status Terhubung Otomatis */}
+        <div className="mt-4 p-4 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] flex items-start space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-[#DCFCE7] flex items-center justify-center shrink-0 text-[#16A34A] mt-0.5">
+            <Check className="w-4 h-4" />
           </div>
-          <p className="text-[11px] text-[#526A7A] mt-1.5">
-            Bagikan kode ini kepada pasangan untuk terhubung ke dalam akuarium yang sama.
-          </p>
+          <div>
+            <h4 className="text-xs font-bold text-[#166534]">Status: Terhubung Otomatis</h4>
+            <p className="text-[11px] text-[#15803D] mt-0.5 leading-relaxed">
+              Akuarium Candut &amp; Repa sudah terhubung secara permanen di cloud Supabase. Anda tidak perlu memasukkan kode pasangan lagi &mdash; cukup bagikan <b>Link Repa</b> ke HP pasangan Anda!
+            </p>
+          </div>
         </div>
-
-        {/* Join with code */}
-        <form onSubmit={handlePair} className="mt-4">
-          <label className="block text-xs font-semibold text-[#182C3A] mb-1.5">
-            Hubungkan dengan Kode Pasangan
-          </label>
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={partnerCodeInput}
-              onChange={(e) => setPartnerCodeInput(e.target.value)}
-              placeholder="Contoh: OCEAN-LOVE7"
-              className="flex-1 px-3 py-2 bg-white border border-[#CBD7DF] rounded-lg text-xs text-[#182C3A] placeholder-[#8A9BA8] focus:outline-none focus:border-[#4A6B82] focus:ring-1 focus:ring-[#4A6B82] uppercase font-mono font-semibold"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-gradient-to-r from-[#4A6B82] to-[#D8738E] hover:opacity-90 text-white text-xs font-semibold rounded-lg transition shadow-xs"
-            >
-              Hubungkan
-            </button>
-          </div>
-        </form>
-
-        {feedback && (
-          <div className="mt-3 p-2.5 rounded-lg text-xs bg-[#EBF2F7] border border-[#CBD7DF] text-[#182C3A] font-medium">
-            {feedback.msg}
-          </div>
-        )}
 
         {/* Backend Status */}
         <div className="mt-5 pt-3 border-t border-[#E2EAF0] flex items-center justify-between text-[11px] text-[#526A7A]">
