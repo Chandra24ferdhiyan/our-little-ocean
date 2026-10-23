@@ -44,7 +44,7 @@ export function Header({
             <img
               src="/brand-logo.png"
               alt="Candut & Saridut — Our Little Ocean"
-              className="h-10 sm:h-12 lg:h-14 w-auto object-contain max-w-[210px] sm:max-w-[260px] lg:max-w-xs transition-all drop-shadow-2xs"
+              className="h-11 sm:h-12 lg:h-14 w-auto object-contain max-w-[230px] sm:max-w-[280px] lg:max-w-[320px] transition-all drop-shadow-2xs select-none"
             />
           </div>
 
