@@ -2,16 +2,12 @@
 
 import React, { useState } from 'react';
 import { useAquarium } from '@/lib/store/AquariumContext';
-import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { 
   Users, 
   X, 
   Copy, 
   Check, 
-  RefreshCw, 
-  Database,
-  Heart,
-  Fish
+  RefreshCw 
 } from 'lucide-react';
 
 interface CoupleModalProps {
@@ -22,7 +18,7 @@ interface CoupleModalProps {
 export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
   const { 
     currentUser, 
-    aquarium,
+    aquarium, 
     switchPartner 
   } = useAquarium();
 
@@ -32,7 +28,8 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
 
   const handleCopyLink = (role: 'candut' | 'repa') => {
     if (typeof window === 'undefined') return;
-    const url = `${window.location.origin}?role=${role}`;
+    const roleParam = role === 'repa' ? 'saridut' : 'candut';
+    const url = `${window.location.origin}?role=${roleParam}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(role);
     setTimeout(() => setCopiedLink(null), 2500);
@@ -95,7 +92,7 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
             )}
           </div>
 
-          {/* Repa */}
+          {/* Saridut */}
           <div
             className={`p-4 rounded-xl border text-center transition ${
               currentUser.partner_role === 'repa'
@@ -106,11 +103,11 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
             <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#F3C5D1] flex items-center justify-center shadow-2xs p-1.5">
               <img
                 src={`/fish/repa_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png`}
-                alt="Repa"
+                alt="Saridut"
                 className="w-full h-full object-contain"
               />
             </div>
-            <h4 className="font-serif text-base text-[#182C3A] mt-2 font-semibold">Repa</h4>
+            <h4 className="font-serif text-base text-[#182C3A] mt-2 font-semibold">Saridut</h4>
             <p className="text-[11px] font-medium text-[#D8738E]">Ikan Rose Quartz</p>
             {currentUser.partner_role === 'repa' ? (
               <span className="inline-block mt-2 px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#D8738E] text-white shadow-2xs">
@@ -122,7 +119,7 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
                 className="mt-2 text-[11px] font-semibold text-[#D8738E] hover:underline flex items-center justify-center mx-auto space-x-1"
               >
                 <RefreshCw className="w-3 h-3" />
-                <span>Beralih ke Repa</span>
+                <span>Beralih ke Saridut</span>
               </button>
             )}
           </div>
@@ -158,35 +155,16 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
               }`}
             >
               {copiedLink === 'repa' ? <Check className="w-3.5 h-3.5 text-[#D8738E]" /> : <Copy className="w-3.5 h-3.5 text-[#D8738E]" />}
-              <span>{copiedLink === 'repa' ? 'Tersalin!' : 'Link Repa'}</span>
+              <span>{copiedLink === 'repa' ? 'Tersalin!' : 'Link Saridut'}</span>
             </button>
           </div>
         </div>
 
-        {/* Status Terhubung Otomatis */}
-        <div className="mt-4 p-4 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] flex items-start space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-[#DCFCE7] flex items-center justify-center shrink-0 text-[#16A34A] mt-0.5">
-            <Check className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="text-xs font-bold text-[#166534]">Status: Terhubung Otomatis</h4>
-            <p className="text-[11px] text-[#15803D] mt-0.5 leading-relaxed">
-              Akuarium Candut &amp; Repa sudah terhubung secara permanen di cloud Supabase. Anda tidak perlu memasukkan kode pasangan lagi &mdash; cukup bagikan <b>Link Repa</b> ke HP pasangan Anda!
-            </p>
-          </div>
-        </div>
-
-        {/* Backend Status */}
-        <div className="mt-5 pt-3 border-t border-[#E2EAF0] flex items-center justify-between text-[11px] text-[#526A7A]">
-          <div className="flex items-center space-x-1.5">
-            <Database className="w-3.5 h-3.5 text-[#4A6B82]" />
-            <span>
-              {isSupabaseConfigured ? 'Supabase PostgreSQL Terhubung' : 'Penyimpanan Persisten Lokal'}
-            </span>
-          </div>
+        {/* Modal Footer Actions */}
+        <div className="mt-5 pt-3 border-t border-[#E2EAF0] flex items-center justify-end">
           <button
             onClick={onClose}
-            className="px-3.5 py-1 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] border border-[#CBD7DF] font-semibold transition"
+            className="px-5 py-2 rounded-xl bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] border border-[#CBD7DF] text-xs font-semibold transition active:scale-95 shadow-2xs"
           >
             Tutup
           </button>

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Dedicated Supabase credentials for Candut & Repa — Our Little Ocean
+// Dedicated Supabase credentials for Candut & Saridut — Our Little Ocean
 const SUPABASE_PROJECT_URL = 'https://guidjuaezxxfbvgxgwqf.supabase.co';
 const SUPABASE_ANON_PUBLIC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1aWRqdWFlenh4ZmJ2Z3hnd3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3NDIwNzgsImV4cCI6MjEwODMxODA3OH0.wb65OUqoXQ-fd9BzNqZGUAkAA7Les560S2_c7Q3CLGg';
 

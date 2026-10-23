@@ -28,7 +28,7 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
     if (msg.recipient_id !== currentUser.id) {
       setBlockedHint({
         id: msg.id,
-        text: `Pesan ditujukan khusus untuk ${msg.sender_role === 'candut' ? 'Repa' : 'Candut'}. Tunggu pasanganmu membukanya.`,
+        text: `Pesan ditujukan khusus untuk ${msg.sender_role === 'candut' ? 'Saridut' : 'Candut'}. Tunggu pasanganmu membukanya.`,
       });
       setTimeout(() => setBlockedHint(null), 3000);
       return;

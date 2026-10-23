@@ -17,10 +17,10 @@ const dmSerif = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  title: 'Candut & Repa — Our Little Ocean',
-  description: 'Ruang interaktif tenang dan cerah untuk pasangan Candut & Repa. Samudera bawah air dengan sistem level 1–500, lima tema atmosferik, dan pesan gelembung intim.',
-  keywords: ['aquarium', 'candut and repa', 'couple aquarium', 'our little ocean', 'indie web experience'],
-  authors: [{ name: 'Candut & Repa' }],
+  title: 'Candut & Saridut — Our Little Ocean',
+  description: 'Ruang interaktif tenang dan cerah untuk pasangan Candut & Saridut. Samudera bawah air dengan sistem level 1–500, lima tema atmosferik, dan pesan gelembung intim.',
+  keywords: ['aquarium', 'candut and saridut', 'couple aquarium', 'our little ocean', 'indie web experience'],
+  authors: [{ name: 'Candut & Saridut' }],
   icons: {
     icon: [
       { url: '/brand-icon.png', type: 'image/png' },

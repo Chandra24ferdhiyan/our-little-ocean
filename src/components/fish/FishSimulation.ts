@@ -50,7 +50,7 @@ export class SimFish {
 
   constructor(role: 'candut' | 'repa', startX: number, startY: number) {
     this.role = role;
-    this.name = role === 'candut' ? 'Candut' : 'Repa';
+    this.name = role === 'candut' ? 'Candut' : 'Saridut';
     this.x = startX;
     this.y = startY;
     this.vx = 0;

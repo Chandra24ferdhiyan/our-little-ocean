@@ -6,7 +6,7 @@ export const LEVEL_MILESTONES: LevelMilestone[] = [
     levelRange: [1, 100],
     title: 'Baby Fish',
     subtitle: 'Awal Pertemuan dan Langkah Pertama',
-    description: 'Candut dan Repa berukuran ramping dan lincah. Keduanya berenang berdampingan menjelajahi aquarium bersama.',
+    description: 'Candut dan Saridut berukuran ramping dan lincah. Keduanya berenang berdampingan menjelajahi aquarium bersama.',
     badge: 'Tahap 1: Bayi Ikan',
     unlockedFeatures: [
       'Bentuk ikan mungil dan gesit',
@@ -32,7 +32,7 @@ export const LEVEL_MILESTONES: LevelMilestone[] = [
     levelRange: [201, 300],
     title: 'Lovely Companions',
     subtitle: 'Aksesoris Khusus dan Keintiman',
-    description: 'Candut dan Repa mengenakan aksesoris identitas khusus. Topi pelaut minimalis untuk Candut dan sematan flora halus untuk Repa.',
+    description: 'Candut dan Saridut mengenakan aksesoris identitas khusus. Topi pelaut minimalis untuk Candut dan sematan flora halus untuk Saridut.',
     badge: 'Tahap 3: Pasangan Manis',
     unlockedFeatures: [
       'Aksesoris identitas pada tubuh kedua ikan',
@@ -45,7 +45,7 @@ export const LEVEL_MILESTONES: LevelMilestone[] = [
     levelRange: [301, 400],
     title: 'Magical Ocean',
     subtitle: 'Pencahayaan Atmosferik dan Pendar Alami',
-    description: 'Pencahayaan bawah air lembut dengan pendaran halus saat ekor Candut dan Repa mengayun di kedalaman.',
+    description: 'Pencahayaan bawah air lembut dengan pendaran halus saat ekor Candut dan Saridut mengayun di kedalaman.',
     badge: 'Tahap 4: Samudera Magis',
     unlockedFeatures: [
       'Aura pendaran halus pada tubuh kedua ikan',
@@ -91,7 +91,7 @@ export const SECRET_REWARDS: SecretReward[] = [
     pellets: 2,
     cooldownHours: 6,
     badge: 'Rahasia 02',
-    description: 'Momen kehangatan personal berdua (pelukan hangat atau kata penyemangat hari ini).',
+    description: '',
   },
   {
     id: 'secret_03',
@@ -99,7 +99,7 @@ export const SECRET_REWARDS: SecretReward[] = [
     pellets: 3,
     cooldownHours: 12,
     badge: 'Rahasia 03',
-    description: 'Mendengarkan cerita privat atau percakapan mendalam larut malam.',
+    description: '',
   },
   {
     id: 'secret_04',
@@ -107,7 +107,7 @@ export const SECRET_REWARDS: SecretReward[] = [
     pellets: 4,
     cooldownHours: 18,
     badge: 'Rahasia 04',
-    description: 'Waktu berkualitas berdua tanpa distraksi lingkungan luar.',
+    description: '',
   },
   {
     id: 'secret_05',
@@ -115,6 +115,6 @@ export const SECRET_REWARDS: SecretReward[] = [
     pellets: 5,
     cooldownHours: 24,
     badge: 'Rahasia 05',
-    description: 'Pernyataan komitmen tulus dan saling menjaga satu sama lain.',
+    description: '',
   },
 ];

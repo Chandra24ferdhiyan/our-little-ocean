@@ -43,7 +43,7 @@ export function Header({
           <div className="flex items-center">
             <img
               src="/brand-logo.png"
-              alt="Candut & Repa — Our Little Ocean"
+              alt="Candut & Saridut — Our Little Ocean"
               className="h-10 sm:h-12 lg:h-14 w-auto object-contain max-w-[210px] sm:max-w-[260px] lg:max-w-xs transition-all drop-shadow-2xs"
             />
           </div>
@@ -118,7 +118,7 @@ export function Header({
             onClick={() => feedFish(1)}
             disabled={aquarium.pellet_balance < 1}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#EBF2F7] hover:bg-[#DDE8F0] border border-[#CBD7DF] text-[#4A6B82] text-xs font-semibold transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Beri makan Candut dan Repa (1 pelet)"
+            title="Beri makan Candut dan Saridut (1 pelet)"
           >
             <img src="/icons/pellet.png" alt="Pelet" className="w-3.5 h-3.5 object-contain" />
             <span className="hidden sm:inline">Beri Makan</span>

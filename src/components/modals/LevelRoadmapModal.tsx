@@ -138,13 +138,13 @@ export function LevelRoadmapModal({ isOpen, onClose }: LevelRoadmapModalProps) {
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#F3C5D1] p-0.5 shadow-2xs">
                           <img
                             src={`/fish/repa_stage${m.stage}.png?v=2`}
-                            alt={`Repa Tahap ${m.stage}`}
+                            alt={`Saridut Tahap ${m.stage}`}
                             className="w-full h-full object-contain"
                           />
                         </div>
                       </div>
                       <span className="text-[11px] font-medium text-[#526A7A]">
-                        Bentuk Candut &amp; Repa Tahap {m.stage}
+                        Bentuk Candut &amp; Saridut Tahap {m.stage}
                       </span>
                     </div>
                   </div>

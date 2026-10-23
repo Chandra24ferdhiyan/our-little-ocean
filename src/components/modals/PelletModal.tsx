@@ -150,7 +150,7 @@ export function PelletModal({ isOpen, onClose }: PelletModalProps) {
                   </button>
                 </div>
                 <p className="text-xs text-[#526A7A] leading-relaxed pt-1">
-                  Dapat diklaim sekali setiap hari untuk merawat Candut dan Repa bersama.
+                  Dapat diklaim sekali setiap hari untuk merawat Candut dan Saridut bersama.
                 </p>
               </div>
 
@@ -184,9 +184,6 @@ export function PelletModal({ isOpen, onClose }: PelletModalProps) {
                       <h4 className="font-serif text-sm text-[#182C3A] font-bold leading-tight">
                         {sec.title}
                       </h4>
-                      <p className="text-[11px] sm:text-xs text-[#526A7A] mt-1 leading-relaxed">
-                        {sec.description}
-                      </p>
                     </div>
 
                     <div className="pt-2 border-t border-[#E2EAF0] flex items-center justify-between">

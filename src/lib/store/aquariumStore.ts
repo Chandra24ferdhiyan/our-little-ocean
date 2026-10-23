@@ -35,8 +35,8 @@ const DEFAULT_CANDUT: UserProfile = {
 
 const DEFAULT_REPA: UserProfile = {
   id: REPA_ID,
-  email: 'repa@ocean.love',
-  display_name: 'Repa',
+  email: 'saridut@ocean.love',
+  display_name: 'Saridut',
   avatar_url: '',
   partner_role: 'repa',
   created_at: '2026-01-01T00:00:00Z',
@@ -88,12 +88,12 @@ export function useAquariumStore() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Detect role from URL query param (?role=repa or ?as=repa) or saved localStorage
+    // Detect role from URL query param (?role=saridut, ?role=repa, etc.) or saved localStorage
     const params = new URLSearchParams(window.location.search);
-    const roleParam = params.get('role') || params.get('as');
+    const roleParam = (params.get('role') || params.get('as') || '').toLowerCase();
     const savedRole = localStorage.getItem(ROLE_STORAGE_KEY);
 
-    if (roleParam === 'repa' || (!roleParam && savedRole === 'repa')) {
+    if (roleParam === 'saridut' || roleParam === 'repa' || (!roleParam && (savedRole === 'saridut' || savedRole === 'repa'))) {
       setCurrentUser(DEFAULT_REPA);
       localStorage.setItem(ROLE_STORAGE_KEY, 'repa');
     } else {
@@ -532,8 +532,8 @@ export function useAquariumStore() {
     const isCandut = currentUser.partner_role === 'candut';
     const senderId = isCandut ? CANDUT_ID : REPA_ID;
     const recipientId = isCandut ? REPA_ID : CANDUT_ID;
-    const senderName = isCandut ? 'Candut' : 'Repa';
-    const recipientName = isCandut ? 'Repa' : 'Candut';
+    const senderName = isCandut ? 'Candut' : 'Saridut';
+    const recipientName = isCandut ? 'Saridut' : 'Candut';
     const senderRole: FishRole = isCandut ? 'candut' : 'repa';
 
     const optimisticMsg: BubbleMessage = {
@@ -610,7 +610,7 @@ export function useAquariumStore() {
     const myId = isCandut ? CANDUT_ID : REPA_ID;
 
     if (target.recipient_id !== myId) {
-      const recipientName = isCandut ? 'Repa' : 'Candut';
+      const recipientName = isCandut ? 'Saridut' : 'Candut';
       return { 
         success: false, 
         error: `Pesan ini ditujukan khusus untuk ${recipientName}. Hanya ${recipientName} yang dapat membukanya.` 
@@ -692,7 +692,7 @@ export function useAquariumStore() {
   }, [messages, currentUser, aquarium]);
 
   const pairWithInviteCode = useCallback((code: string): { success: boolean; message: string } => {
-    return { success: true, message: 'Akuarium Candut & Repa sudah otomatis terhubung secara permanen.' };
+    return { success: true, message: 'Akuarium Candut & Saridut sudah otomatis terhubung secara permanen.' };
   }, []);
 
   const updateProfile = useCallback((name: string, role: FishRole) => {

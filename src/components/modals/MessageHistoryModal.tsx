@@ -138,7 +138,7 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
                     <div className="flex items-center space-x-2">
                       {getCategoryIcon(msg.category || 'love')}
                       <span className="text-xs font-semibold text-[#182C3A]">
-                        {isFromMe ? `Anda kepada ${msg.sender_role === 'candut' ? 'Repa' : 'Candut'}` : msg.sender_name}
+                        {isFromMe ? `Anda kepada ${msg.sender_role === 'candut' ? 'Saridut' : 'Candut'}` : msg.sender_name}
                       </span>
                     </div>
                     <div className="flex items-center space-x-1.5 text-[11px]">
