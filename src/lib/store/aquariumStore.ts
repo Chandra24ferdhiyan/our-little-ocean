@@ -232,6 +232,65 @@ export function useAquariumStore() {
     };
   }, []);
 
+  // 2b. High-Reliability Periodic Poller & Window Focus Sync (Guarantees multi-device sync even if mobile WebSocket sleeps)
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const client = supabase;
+
+    const syncLatestFromCloud = async () => {
+      try {
+        const { data: aquaData } = await client
+          .from('aquariums')
+          .select('*')
+          .eq('id', AQUARIUM_ID)
+          .maybeSingle();
+
+        if (aquaData) {
+          setAquarium((prev) => {
+            if (
+              prev.pellet_balance !== aquaData.pellet_balance ||
+              prev.current_xp !== aquaData.current_xp ||
+              prev.current_level !== aquaData.current_level ||
+              prev.active_theme !== aquaData.active_theme
+            ) {
+              return aquaData as AquariumData;
+            }
+            return prev;
+          });
+        }
+
+        const { data: msgData } = await client
+          .from('bubble_messages')
+          .select('*')
+          .eq('aquarium_id', AQUARIUM_ID)
+          .order('created_at', { ascending: false });
+
+        if (msgData) {
+          setMessages(msgData as BubbleMessage[]);
+        }
+      } catch (err) {
+        // Silent background sync
+      }
+    };
+
+    // Auto poll every 3 seconds for seamless synchronization
+    const timer = setInterval(syncLatestFromCloud, 3000);
+
+    // Sync whenever tab is focused or phone is unlocked
+    const onWindowFocus = () => {
+      syncLatestFromCloud();
+    };
+
+    window.addEventListener('focus', onWindowFocus);
+    window.addEventListener('visibilitychange', onWindowFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', onWindowFocus);
+      window.removeEventListener('visibilitychange', onWindowFocus);
+    };
+  }, []);
+
   // 3. Save to localStorage for instant offline access
   useEffect(() => {
     if (!isLoaded || typeof window === 'undefined') return;
