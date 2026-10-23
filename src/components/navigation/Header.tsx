@@ -48,8 +48,21 @@ export function Header({
             />
           </div>
 
-          {/* Audio Mute Button on Mobile only (< md) */}
-          <div className="flex md:hidden items-center">
+          {/* Role Indicator & Audio Mute Button on Mobile only (< md) */}
+          <div className="flex md:hidden items-center space-x-2">
+            <button
+              onClick={onOpenCouple}
+              title="Ganti peran atau kelola profil"
+              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition shadow-2xs active:scale-95 ${
+                currentUser.partner_role === 'candut'
+                  ? 'bg-[#EBF2F7] border-[#4A6B82]/40 text-[#4A6B82]'
+                  : 'bg-[#FCE8EE] border-[#D8738E]/40 text-[#D8738E]'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${currentUser.partner_role === 'candut' ? 'bg-[#4A6B82]' : 'bg-[#D8738E]'}`} />
+              <span>{currentUser.display_name}</span>
+            </button>
+
             <button
               onClick={handleAudioToggle}
               aria-label={muted ? 'Aktifkan suara' : 'Bisukan suara'}
@@ -157,10 +170,15 @@ export function Header({
           {/* Pasangan (Tampil di Desktop lg+) */}
           <button
             onClick={onOpenCouple}
-            className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#F8FAFC] border border-[#CBD7DF] text-[#182C3A] text-xs font-semibold hover:border-[#4A6B82] transition"
+            title="Ganti peran atau kelola profil pasangan"
+            className={`hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition active:scale-95 ${
+              currentUser.partner_role === 'candut'
+                ? 'bg-[#EBF2F7] border-[#4A6B82]/40 text-[#4A6B82] hover:bg-[#DDE8F0]'
+                : 'bg-[#FCE8EE] border-[#D8738E]/40 text-[#D8738E] hover:bg-[#F9D6DF]'
+            }`}
           >
             <span className={`w-2 h-2 rounded-full ${currentUser.partner_role === 'candut' ? 'bg-[#4A6B82]' : 'bg-[#D8738E]'}`} />
-            <span>{currentUser.display_name}</span>
+            <span>Kamu: {currentUser.display_name}</span>
           </button>
         </div>
 

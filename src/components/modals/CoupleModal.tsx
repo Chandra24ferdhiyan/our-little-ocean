@@ -30,6 +30,7 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
 
   const [partnerCodeInput, setPartnerCodeInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState<'candut' | 'repa' | null>(null);
   const [feedback, setFeedback] = useState<{ success: boolean; msg: string } | null>(null);
 
   if (!isOpen) return null;
@@ -38,6 +39,14 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
     navigator.clipboard.writeText(couple.invitation_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyLink = (role: 'candut' | 'repa') => {
+    if (typeof window === 'undefined') return;
+    const url = `${window.location.origin}?role=${role}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(role);
+    setTimeout(() => setCopiedLink(null), 2500);
   };
 
   const handlePair = (e: React.FormEvent) => {
@@ -138,8 +147,43 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
           </div>
         </div>
 
-        {/* Invitation Code */}
+        {/* Quick Role Direct Links (WhatsApp / Shareable) */}
         <div className="mt-5 p-4 rounded-xl bg-[#F8FAFC] border border-[#E2EAF0]">
+          <label className="block text-xs font-semibold text-[#182C3A] mb-1">
+            Tautan Cepat Akses Pasangan (Kirim via Chat/WhatsApp)
+          </label>
+          <p className="text-[11px] text-[#526A7A] mb-2.5">
+            Salin tautan di bawah dan buka di masing-masing perangkat agar peran otomatis terpasang:
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleCopyLink('candut')}
+              className={`py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-1.5 transition active:scale-95 shadow-2xs ${
+                copiedLink === 'candut'
+                  ? 'bg-[#EBF2F7] border-[#4A6B82] text-[#4A6B82]'
+                  : 'bg-white border-[#CBD7DF] hover:border-[#4A6B82] text-[#4A6B82]'
+              }`}
+            >
+              {copiedLink === 'candut' ? <Check className="w-3.5 h-3.5 text-[#4A6B82]" /> : <Copy className="w-3.5 h-3.5 text-[#4A6B82]" />}
+              <span>{copiedLink === 'candut' ? 'Tersalin!' : 'Link Candut'}</span>
+            </button>
+
+            <button
+              onClick={() => handleCopyLink('repa')}
+              className={`py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-1.5 transition active:scale-95 shadow-2xs ${
+                copiedLink === 'repa'
+                  ? 'bg-[#FCE8EE] border-[#D8738E] text-[#D8738E]'
+                  : 'bg-white border-[#CBD7DF] hover:border-[#D8738E] text-[#D8738E]'
+              }`}
+            >
+              {copiedLink === 'repa' ? <Check className="w-3.5 h-3.5 text-[#D8738E]" /> : <Copy className="w-3.5 h-3.5 text-[#D8738E]" />}
+              <span>{copiedLink === 'repa' ? 'Tersalin!' : 'Link Repa'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Invitation Code */}
+        <div className="mt-4 p-4 rounded-xl bg-[#F8FAFC] border border-[#E2EAF0]">
           <label className="block text-xs font-semibold text-[#182C3A] mb-1.5">
             Kode Undangan Akuarium
           </label>
