@@ -15,8 +15,8 @@
   }
 
   body {
-    background-color: #F4F7F9;
-    color: #182C3A;
+    background-color: #071118;
+    color: #E8F1F5;
     font-family: var(--font-sans);
     overflow-x: hidden;
   }
@@ -30,20 +30,20 @@
   font-family: var(--font-sans);
 }
 
-/* Light Pearl Aesthetic Scrollbar */
+/* Dark Ocean Aesthetic Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F4F7F9;
+  background: #071118;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD7DF;
+  background: #1C3345;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9BB3C1;
+  background: #3B6E8C;
 }
 
 /* Subtle Fade-in */

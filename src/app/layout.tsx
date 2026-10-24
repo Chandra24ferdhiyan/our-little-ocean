@@ -36,7 +36,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#F4F7F9',
+  themeColor: '#071118',
 };
 
 export default function RootLayout({
@@ -46,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" className={`${manrope.variable} ${dmSerif.variable}`}>
-      <body className="bg-[#F4F7F9] text-[#182C3A] font-sans antialiased min-h-screen selection:bg-[#F3C5D1] selection:text-[#182C3A]">
+      <body className="bg-[#071118] text-[#E8F1F5] font-sans antialiased min-h-screen selection:bg-[#D8738E]/30 selection:text-white">
         <AquariumProvider>
           {children}
         </AquariumProvider>

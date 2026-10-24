@@ -59,7 +59,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F7F9] text-[#182C3A] relative overflow-x-hidden pb-16 md:pb-6">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#071118] via-[#0C1A24] to-[#112330] text-[#E8F1F5] relative overflow-x-hidden pb-16 md:pb-6">
       {/* Editorial Header (Desktop Actions & Mobile Title/Audio) */}
       <Header
         onOpenCreateBubble={() => setIsCreateBubbleOpen(true)}
@@ -72,10 +72,13 @@ export default function HomePage() {
 
       {/* Main Focus: Pure Cinematic Aquarium Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 py-2 sm:py-4 flex flex-col items-center justify-center">
-        {/* Outer Aquarium Wrapper with Desktop Decorative Pedestals */}
+        {/* Outer Aquarium Wrapper with Atmospheric Backlight Halo */}
         <div className="relative w-full max-w-6xl mx-auto">
-          {/* Pure Aquarium Viewport (Zero Overlay Icons or Badges Inside) */}
-          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] max-h-[740px] rounded-2xl overflow-hidden border border-[#CBD7DF] bg-[#EAF0F4] shadow-xl">
+          {/* Ambient Backlight Halo behind the tank */}
+          <div className="absolute -inset-2 sm:-inset-6 bg-gradient-to-r from-[#3B6E8C]/25 via-[#5BA4C7]/20 to-[#D8738E]/20 rounded-3xl blur-2xl pointer-events-none opacity-80" />
+
+          {/* Pure Aquarium Viewport */}
+          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] max-h-[740px] rounded-2xl overflow-hidden border border-white/20 bg-[#07131B] shadow-[0_16px_50px_rgba(0,0,0,0.65)] ring-1 ring-white/10">
             {/* Canvas 60fps Fish Simulation */}
             <AquariumCanvas />
 
@@ -87,7 +90,7 @@ export default function HomePage() {
             />
 
             {/* Subtle Bottom Shade */}
-            <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/15 to-transparent pointer-events-none z-10" />
+            <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/25 to-transparent pointer-events-none z-10" />
           </div>
 
           {/* Seabed Ambient Decorations:
@@ -102,7 +105,7 @@ export default function HomePage() {
           {/* + Tulis Pesan */}
           <button
             onClick={() => setIsCreateBubbleOpen(true)}
-            className="flex-1 py-2 px-2.5 rounded-xl bg-gradient-to-r from-[#4A6B82] via-[#7B7086] to-[#D8738E] text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-xs active:scale-95 transition"
+            className="flex-1 py-2 px-2.5 rounded-xl bg-gradient-to-r from-[#4A6B82] via-[#7B7086] to-[#D8738E] text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md active:scale-95 transition"
           >
             <img src="/icons/icon_plus.png" alt="Pesan" className="w-4 h-4 object-contain inline-block shrink-0" />
             <span>Tulis Pesan</span>
@@ -112,8 +115,8 @@ export default function HomePage() {
           <button
             onClick={() => feedFish(1)}
             disabled={aquarium.pellet_balance < 1}
-            className="flex-1 py-2 px-2.5 rounded-xl bg-white border border-[#CBD7DF] text-[#526A7A] hover:text-[#182C3A] text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-2xs active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Beri makan Candut dan Repa (1 pelet)"
+            className="flex-1 py-2 px-2.5 rounded-xl bg-[#142633]/85 hover:bg-[#1C3345] border border-white/15 text-white/90 text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md backdrop-blur-md active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Beri makan Candut dan Saridut (1 pelet)"
           >
             <img src="/icons/pellet.png" alt="Pelet" className="w-4 h-4 object-contain inline-block shrink-0" />
             <span>Beri Makan</span>
@@ -122,11 +125,11 @@ export default function HomePage() {
           {/* Jumlah Pelet */}
           <button
             onClick={() => setIsPelletOpen(true)}
-            className="py-2 px-3 rounded-xl bg-white border border-[#CBD7DF] text-[#182C3A] text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-2xs active:scale-95 transition"
+            className="py-2 px-3 rounded-xl bg-[#142633]/85 hover:bg-[#1C3345] border border-white/15 text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md backdrop-blur-md active:scale-95 transition"
             title="Inventaris Pelet dan Hadiah"
           >
             <img src="/icons/pellet_coin.png" alt="Jumlah Pelet" className="w-4 h-4 object-contain inline-block shrink-0" />
-            <span className="font-mono text-[#4A6B82] font-bold">{aquarium.pellet_balance}</span>
+            <span className="font-mono text-[#F5B041] font-bold">{aquarium.pellet_balance}</span>
             <span>Pelet</span>
           </button>
         </div>

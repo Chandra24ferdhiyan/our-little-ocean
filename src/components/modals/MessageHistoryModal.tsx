@@ -49,7 +49,7 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/30 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#071118]/70 backdrop-blur-sm animate-fadeIn">
       <div className="relative w-full max-w-xl bg-white border border-[#E2EAF0] rounded-2xl p-4 sm:p-6 md:p-7 shadow-2xl text-[#182C3A] max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-[#E2EAF0]">
