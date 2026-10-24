@@ -63,7 +63,7 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage, onReply 
               <h2 className="font-serif text-xl text-[#182C3A] tracking-wide font-bold">Riwayat Pesan Cinta</h2>
               <div className="flex items-center space-x-1.5 text-xs text-[#526A7A] mt-0.5">
                 <Clock className="w-3.5 h-3.5 text-[#4A6B82]" />
-                <span>Pesan tersimpan otomatis selama 7 hari</span>
+                <span>Pesan tersimpan otomatis selama 3 hari</span>
               </div>
             </div>
           </div>

@@ -26,7 +26,7 @@ export const REPA_ID = '00000000-0000-0000-0000-000000000002';
 export const COUPLE_ID = '00000000-0000-0000-0000-000000000010';
 export const AQUARIUM_ID = '00000000-0000-0000-0000-000000000100';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 export const sanitizeAndFilterMessages = (msgs: BubbleMessage[]): BubbleMessage[] => {
   const now = Date.now();
@@ -38,14 +38,14 @@ export const sanitizeAndFilterMessages = (msgs: BubbleMessage[]): BubbleMessage[
         if (!isNaN(unlockTime) && unlockTime > now) {
           return true; // Still locked in the deep ocean, preserve it!
         }
-        // If unlocked, retain for 7 days from unlock time
+        // If unlocked, retain for 3 days from unlock time
         const baseTime = !isNaN(unlockTime) ? unlockTime : new Date(m.created_at).getTime();
-        return isNaN(baseTime) || now - baseTime <= SEVEN_DAYS_MS;
+        return isNaN(baseTime) || now - baseTime <= THREE_DAYS_MS;
       }
 
       if (!m.created_at) return true;
       const t = new Date(m.created_at).getTime();
-      return isNaN(t) || now - t <= SEVEN_DAYS_MS;
+      return isNaN(t) || now - t <= THREE_DAYS_MS;
     })
     .map((m) => {
       const isRepa = m.sender_role === 'repa' || (m.sender_name && m.sender_name.toLowerCase().includes('repa'));
@@ -191,23 +191,23 @@ export function useAquariumStore() {
           setAquarium(aquaData as AquariumData);
         }
 
-        const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
+        const threeDaysAgo = new Date(Date.now() - THREE_DAYS_MS).toISOString();
         const { data: msgData, error: msgErr } = await client
           .from('bubble_messages')
           .select('*')
           .eq('aquarium_id', AQUARIUM_ID)
-          .gte('created_at', sevenDaysAgo)
+          .gte('created_at', threeDaysAgo)
           .order('created_at', { ascending: false });
 
         if (msgData && !msgErr) {
           setMessages(sanitizeAndFilterMessages(msgData as BubbleMessage[]));
         }
 
-        // Auto-cleanup expired messages older than 7 days in cloud
+        // Auto-cleanup expired messages older than 3 days in cloud
         client
           .from('bubble_messages')
           .delete()
-          .lt('created_at', sevenDaysAgo)
+          .lt('created_at', threeDaysAgo)
           .then(() => {});
       } catch (err) {
         console.warn('Supabase initial fetch warning:', err);
@@ -289,12 +289,12 @@ export function useAquariumStore() {
           });
         }
 
-        const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
+        const threeDaysAgo = new Date(Date.now() - THREE_DAYS_MS).toISOString();
         const { data: msgData } = await client
           .from('bubble_messages')
           .select('*')
           .eq('aquarium_id', AQUARIUM_ID)
-          .gte('created_at', sevenDaysAgo)
+          .gte('created_at', threeDaysAgo)
           .order('created_at', { ascending: false });
 
         if (msgData) {
