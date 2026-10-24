@@ -176,9 +176,17 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
                 </div>
 
                 {/* Typographic Sender Label */}
-                <span className="text-[10px] font-bold tracking-wider uppercase text-white drop-shadow-sm">
+                <span className="text-[10px] font-bold tracking-wider uppercase text-white drop-shadow-sm leading-none">
                   {senderDisplayName}
                 </span>
+
+                {/* Reply Indicator Pill */}
+                {msg.reply_to_message && (
+                  <span className="text-[8px] font-extrabold tracking-tight text-[#85C1E9] bg-[#07131B]/85 px-2 py-0.5 rounded-full border border-[#85C1E9]/40 flex items-center space-x-1 mt-1 shadow-xs">
+                    <CornerUpLeft className="w-2.5 h-2.5 shrink-0" />
+                    <span>Balasan</span>
+                  </span>
+                )}
 
                 {/* Voice Note Indicator */}
                 {hasVoiceNote && (
@@ -223,18 +231,23 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
             )}
 
             {/* Hover Tooltip */}
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none min-w-[150px] z-20">
-              <div className="bg-white text-[#182C3A] text-xs px-3 py-1.5 rounded-xl border border-[#CBD7DF] text-center shadow-lg">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none min-w-[170px] max-w-[220px] z-20">
+              <div className="bg-white text-[#182C3A] text-xs px-3 py-2 rounded-xl border border-[#CBD7DF] text-center shadow-lg w-full">
                 {msg.reply_to_message && (
-                  <div className="flex items-center justify-center space-x-1 text-[10px] font-semibold text-[#4A6B82] mb-0.5">
-                    <CornerUpLeft className="w-3 h-3" />
-                    <span>Balasan untuk {msg.reply_to_sender_name || 'pasangan'}</span>
+                  <div className="mb-1.5 pb-1.5 border-b border-[#E2EAF0] text-left">
+                    <div className="flex items-center space-x-1 text-[10px] font-bold text-[#D8738E]">
+                      <CornerUpLeft className="w-3 h-3 shrink-0" />
+                      <span className="truncate">Membalas {msg.reply_to_sender_name || 'pesan'}:</span>
+                    </div>
+                    <p className="text-[10px] text-[#526A7A] italic line-clamp-1 mt-0.5">
+                      &ldquo;{msg.reply_to_message}&rdquo;
+                    </p>
                   </div>
                 )}
                 <p className={`font-semibold ${isFromCandut ? 'text-[#4A6B82]' : 'text-[#D8738E]'}`}>
                   {isTimeCapsule ? 'Kapsul Waktu Laut Dalam' : senderDisplayName}
                 </p>
-                <p className="text-[11px] text-[#526A7A]">
+                <p className="text-[11px] text-[#526A7A] mt-0.5">
                   {isCapsuleLocked 
                     ? 'Terkunci hingga waktunya tiba' 
                     : hasVoiceNote 

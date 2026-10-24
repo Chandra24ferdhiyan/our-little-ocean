@@ -198,12 +198,17 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
 
         {/* Quoted Message (If this message is a reply to an earlier message) */}
         {message.reply_to_message && (
-          <div className="mb-4 p-3 rounded-xl bg-[#F1F5F8] border-l-4 border-l-[#4A6B82] border border-[#CBD7DF] text-xs">
-            <div className="flex items-center space-x-1.5 text-[11px] font-bold text-[#4A6B82] mb-1">
-              <CornerUpLeft className="w-3.5 h-3.5" />
-              <span>Membalas {message.reply_to_sender_name || 'pesan'}:</span>
+          <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-[#F1F5F8] to-[#FFF9FB] border-l-4 border-l-[#D8738E] border border-[#E2EAF0] text-xs shadow-2xs">
+            <div className="flex items-center justify-between text-[11px] font-bold text-[#D8738E] mb-1">
+              <span className="flex items-center space-x-1.5">
+                <CornerUpLeft className="w-3.5 h-3.5" />
+                <span>Membalas Pesan {message.reply_to_sender_name || 'Pasangan'}:</span>
+              </span>
+              <span className="text-[10px] text-[#526A7A] font-medium uppercase tracking-wider bg-white/90 px-2 py-0.5 rounded-full border border-[#E2EAF0]">
+                Pesan Sebelumnya
+              </span>
             </div>
-            <p className="text-[#526A7A] italic line-clamp-2">
+            <p className="text-[#334D5C] italic line-clamp-3 bg-white/90 p-2.5 rounded-xl border border-black/5 mt-1.5 leading-relaxed">
               &ldquo;{message.reply_to_message}&rdquo;
             </p>
           </div>

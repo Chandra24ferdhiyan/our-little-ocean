@@ -28,6 +28,49 @@ export const AQUARIUM_ID = '00000000-0000-0000-0000-000000000100';
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
+export const encodeReplyInMessage = (
+  text: string, 
+  replyToSender: string | null | undefined, 
+  replyToMessage: string | null | undefined
+): string => {
+  if (!replyToMessage) return text;
+  const meta = JSON.stringify({
+    s: replyToSender || '',
+    m: replyToMessage.slice(0, 160),
+  });
+  return `<!--reply:${encodeURIComponent(meta)}-->${text}`;
+};
+
+export const parseReplyMetadata = (rawMsg: BubbleMessage): BubbleMessage => {
+  let text = rawMsg.message || '';
+  let replySender = rawMsg.reply_to_sender_name || null;
+  let replyText = rawMsg.reply_to_message || null;
+
+  const match = text.match(/<!--reply:(.*?)-->/);
+  if (match && match[1]) {
+    try {
+      const decoded = JSON.parse(decodeURIComponent(match[1]));
+      if (decoded.s && !replySender) replySender = decoded.s;
+      if (decoded.m && !replyText) replyText = decoded.m;
+      text = text.replace(match[0], '');
+    } catch (_) {
+      try {
+        const decoded = JSON.parse(match[1]);
+        if (decoded.s && !replySender) replySender = decoded.s;
+        if (decoded.m && !replyText) replyText = decoded.m;
+        text = text.replace(match[0], '');
+      } catch (_) {}
+    }
+  }
+
+  return {
+    ...rawMsg,
+    message: text,
+    reply_to_sender_name: replySender,
+    reply_to_message: replyText,
+  };
+};
+
 export const sanitizeAndFilterMessages = (msgs: BubbleMessage[]): BubbleMessage[] => {
   const now = Date.now();
   return msgs
@@ -48,10 +91,11 @@ export const sanitizeAndFilterMessages = (msgs: BubbleMessage[]): BubbleMessage[
       return isNaN(t) || now - t <= THREE_DAYS_MS;
     })
     .map((m) => {
-      const isRepa = m.sender_role === 'repa' || (m.sender_name && m.sender_name.toLowerCase().includes('repa'));
+      const parsed = parseReplyMetadata(m);
+      const isRepa = parsed.sender_role === 'repa' || (parsed.sender_name && parsed.sender_name.toLowerCase().includes('repa'));
       return {
-        ...m,
-        sender_name: isRepa ? 'Saridut' : m.sender_name,
+        ...parsed,
+        sender_name: isRepa ? 'Saridut' : parsed.sender_name,
       };
     });
 };
@@ -656,13 +700,19 @@ export function useAquariumStore() {
       const client = supabase;
       (async () => {
         try {
+          const encodedMessage = encodeReplyInMessage(
+            finalMessage, 
+            optimisticMsg.reply_to_sender_name, 
+            optimisticMsg.reply_to_message
+          );
+
           const payload: Record<string, any> = {
             aquarium_id: AQUARIUM_ID,
             sender_id: senderId,
             recipient_id: recipientId,
             sender_name: senderName,
             sender_role: senderRole,
-            message: finalMessage,
+            message: encodedMessage,
             bubble_color,
             category,
             status: 'pending',
