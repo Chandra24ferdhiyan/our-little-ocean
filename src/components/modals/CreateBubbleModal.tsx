@@ -224,8 +224,8 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/30 backdrop-blur-xs animate-fadeIn">
-      <div className="relative w-full max-w-lg bg-white border border-[#E2EAF0] rounded-2xl p-4 sm:p-6 md:p-7 shadow-2xl text-[#182C3A] max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/50 backdrop-blur-sm animate-fadeIn">
+      <div className="relative w-full max-w-lg bg-white border border-[#E2EAF0] rounded-2xl p-4 sm:p-6 md:p-7 shadow-2xl text-[#182C3A] max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-[#E2EAF0]">
           <div>
@@ -301,18 +301,16 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
           ) : (
             /* Voice Note / Whisper Studio */
             <div className="p-4 bg-[#FFF9FB] border border-[#F3C5D1] rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-white border border-[#F3C5D1] p-1 flex items-center justify-center">
-                    <img src="/icons/whisper_voice.png" alt="Bisikan Suara" className="w-full h-full object-contain" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-[#182C3A]">Studio Bisikan Suara Bawah Air</h4>
-                    <p className="text-[11px] text-[#526A7A]">Rekam pesan audio hingga 30 detik</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <img src="/icons/whisper_voice.png" alt="Bisikan Suara" className="w-8 h-8 object-contain shrink-0 drop-shadow-xs" />
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-[#182C3A] truncate">Studio Bisikan Suara Bawah Air</h4>
+                    <p className="text-[10px] text-[#526A7A] truncate">Rekam pesan audio hingga 30 detik</p>
                   </div>
                 </div>
 
-                <div className="text-sm font-mono font-bold text-[#D8738E] px-2.5 py-0.5 rounded-lg bg-white border border-[#F3C5D1]">
+                <div className="shrink-0 text-xs font-mono font-bold text-[#D8738E] px-2.5 py-1 rounded-lg bg-white border border-[#F3C5D1] shadow-2xs whitespace-nowrap">
                   00:{recordDuration < 10 ? `0${recordDuration}` : recordDuration} / 00:30
                 </div>
               </div>
@@ -380,8 +378,8 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   maxLength={120}
-                  placeholder="Tambahkan catatan singkat untuk bisikan suara ini (opsional)..."
-                  className="w-full px-3 py-1.5 bg-white border border-[#CBD7DF] rounded-xl text-xs text-[#182C3A] placeholder-[#8A9BA8] focus:outline-none focus:border-[#D8738E]"
+                  placeholder="Catatan manis untuk suara ini (opsional)..."
+                  className="w-full px-3.5 py-2 bg-white border border-[#CBD7DF] rounded-xl text-xs text-[#182C3A] placeholder-[#8A9BA8] focus:outline-none focus:border-[#D8738E] transition"
                 />
               </div>
             </div>
@@ -389,18 +387,16 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
 
           {/* Feature #2: Deep Sea Time Capsule Toggle */}
           <div className="p-3.5 rounded-xl border border-[#CBD7DF] bg-[#F8FAFC]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-white border border-[#CBD7DF] p-0.5 flex items-center justify-center">
-                  <img src="/icons/time_capsule.png" alt="Kapsul Waktu" className="w-full h-full object-contain" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-[#182C3A]">Kapsul Waktu Laut Dalam</h4>
-                  <p className="text-[11px] text-[#526A7A]">Kunci pesan hingga tanggal tertentu di masa depan</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <img src="/icons/time_capsule.png" alt="Kapsul Waktu" className="w-8 h-8 object-contain shrink-0 drop-shadow-xs" />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-[#182C3A] truncate">Kapsul Waktu Laut Dalam</h4>
+                  <p className="text-[10px] text-[#526A7A] truncate">Kunci pesan hingga tanggal rahasia</p>
                 </div>
               </div>
 
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
                 <input
                   type="checkbox"
                   checked={isCapsule}

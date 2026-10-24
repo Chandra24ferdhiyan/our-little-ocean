@@ -90,8 +90,8 @@ export function ViewBubbleModal({ message, onClose }: ViewBubbleModalProps) {
   const xpReward = message.is_capsule ? 50 : 25;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/30 backdrop-blur-xs animate-fadeIn">
-      <div className="relative w-full max-w-md bg-white border border-[#E2EAF0] rounded-2xl p-5 sm:p-6 md:p-8 shadow-2xl text-[#182C3A]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/50 backdrop-blur-sm animate-fadeIn">
+      <div className="relative w-full max-w-md bg-white border border-[#E2EAF0] rounded-2xl p-5 sm:p-6 md:p-8 shadow-2xl text-[#182C3A] max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={() => {

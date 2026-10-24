@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAquarium } from '@/lib/store/AquariumContext';
 import { BubbleMessage } from '@/types/aquarium';
 import { 
@@ -122,32 +123,33 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
           >
             {/* Iridescent Realistic Glass Bubble OR Time Capsule Bottle */}
             {isTimeCapsule ? (
-              <div
-                className={`relative flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300 group-hover:scale-110 ${
-                  isCapsuleLocked 
-                    ? 'bg-amber-950/25 border border-amber-300/60 shadow-lg' 
-                    : 'bg-amber-500/30 border border-amber-300 ring-2 ring-amber-300/50 shadow-xl animate-pulse'
-                } backdrop-blur-xs`}
-              >
+              <div className="relative flex flex-col items-center justify-center transition-all duration-300 group-hover:scale-110">
+                {/* Ambient underwater glow */}
+                <div
+                  className={`absolute -inset-1 rounded-full blur-xs transition-opacity ${
+                    isCapsuleLocked ? 'bg-amber-400/25' : 'bg-emerald-400/35 animate-pulse'
+                  }`}
+                />
+
                 {/* 3D Time Capsule Icon */}
                 <div className="w-12 h-12 md:w-14 md:h-14 relative flex items-center justify-center">
                   <img 
                     src="/icons/time_capsule.png" 
                     alt="Kapsul Waktu" 
-                    className="w-full h-full object-contain drop-shadow-md" 
+                    className="w-full h-full object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.4)]" 
                   />
                   {isCapsuleLocked ? (
-                    <div className="absolute -bottom-1 -right-1 bg-amber-500 text-white p-1 rounded-full shadow-xs">
+                    <div className="absolute -bottom-0.5 -right-0.5 bg-amber-500 text-white p-1 rounded-full shadow-md border border-white/70">
                       <Lock className="w-2.5 h-2.5" />
                     </div>
                   ) : (
-                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full shadow-xs animate-bounce">
+                    <div className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white p-1 rounded-full shadow-md border border-white/70 animate-bounce">
                       <Unlock className="w-2.5 h-2.5" />
                     </div>
                   )}
                 </div>
 
-                <span className="text-[9px] font-bold tracking-wider uppercase text-amber-100 drop-shadow-md mt-0.5">
+                <span className="text-[9px] font-bold tracking-wider uppercase text-amber-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] mt-0.5 px-2 py-0.5 rounded-full bg-[#182C3A]/60 backdrop-blur-2xs border border-amber-300/30">
                   {isCapsuleLocked ? 'Kapsul Waktu' : 'Kapsul Terbuka!'}
                 </span>
               </div>
@@ -239,7 +241,7 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
       })}
 
       {/* Feature #2: Interactive Locked Time Capsule Countdown Modal */}
-      {lockedCapsuleView && lockedCapsuleView.unlock_at && (() => {
+      {lockedCapsuleView && lockedCapsuleView.unlock_at && typeof document !== 'undefined' && (() => {
         const time = formatRemainingTime(lockedCapsuleView.unlock_at);
         const isFromCandut = lockedCapsuleView.sender_role === 'candut';
         const sender = isFromCandut ? 'Candut' : 'Saridut';
@@ -251,64 +253,67 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
           minute: '2-digit',
         });
 
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/40 backdrop-blur-xs animate-fadeIn pointer-events-auto">
-            <div className="relative w-full max-w-sm bg-white border border-[#CBD7DF] rounded-2xl p-6 shadow-2xl text-[#182C3A] text-center">
+        return createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/60 backdrop-blur-sm animate-fadeIn pointer-events-auto">
+            <div className="relative w-full max-w-sm bg-white border border-[#CBD7DF] rounded-2xl p-6 shadow-2xl text-[#182C3A] text-center max-h-[90vh] overflow-y-auto">
               <button
                 onClick={() => setLockedCapsuleView(null)}
-                className="absolute top-4 right-4 p-1 rounded-lg text-[#526A7A] hover:text-[#182C3A] hover:bg-[#F4F7F9]"
+                aria-label="Tutup modal"
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-[#526A7A] hover:text-[#182C3A] hover:bg-[#F4F7F9] transition"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="w-20 h-20 mx-auto mb-3 relative flex items-center justify-center">
+              <div className="w-24 h-24 mx-auto mb-2 relative flex items-center justify-center">
+                <div className="absolute inset-2 bg-gradient-to-tr from-amber-200/50 via-teal-200/40 to-amber-100/50 rounded-full blur-md" />
                 <img 
                   src="/icons/time_capsule.png" 
                   alt="Kapsul Waktu" 
-                  className="w-full h-full object-contain drop-shadow-lg animate-pulse" 
+                  className="w-20 h-20 object-contain drop-shadow-md animate-pulse relative z-10" 
                 />
               </div>
 
-              <h3 className="font-serif text-lg font-bold text-[#182C3A]">
+              <h3 className="font-serif text-xl font-bold text-[#182C3A]">
                 Kapsul Waktu Laut Dalam
               </h3>
               <p className="text-xs text-[#526A7A] mt-1">
-                Disimpan oleh <strong>{sender}</strong> dengan penuh cinta
+                Disimpan oleh <strong className="text-[#182C3A]">{sender}</strong> dengan penuh cinta
               </p>
 
               {/* Countdown Ticker Cards */}
-              <div className="grid grid-cols-4 gap-2 my-5 p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A]">
+              <div className="grid grid-cols-4 gap-2 my-5 p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] shadow-inner">
                 <div>
-                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.days}</div>
-                  <div className="text-[10px] text-[#92400E] font-medium">HARI</div>
+                  <div className="text-xl font-mono font-bold text-[#B45309]">{time.days}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium tracking-wider uppercase">Hari</div>
                 </div>
                 <div>
-                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.hours}</div>
-                  <div className="text-[10px] text-[#92400E] font-medium">JAM</div>
+                  <div className="text-xl font-mono font-bold text-[#B45309]">{time.hours}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium tracking-wider uppercase">Jam</div>
                 </div>
                 <div>
-                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.minutes}</div>
-                  <div className="text-[10px] text-[#92400E] font-medium">MENIT</div>
+                  <div className="text-xl font-mono font-bold text-[#B45309]">{time.minutes}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium tracking-wider uppercase">Menit</div>
                 </div>
                 <div>
-                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.seconds}</div>
-                  <div className="text-[10px] text-[#92400E] font-medium">DETIK</div>
+                  <div className="text-xl font-mono font-bold text-[#B45309]">{time.seconds}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium tracking-wider uppercase">Detik</div>
                 </div>
               </div>
 
-              <p className="text-xs text-[#526A7A] leading-relaxed mb-4">
+              <p className="text-xs text-[#526A7A] leading-relaxed mb-5">
                 Kapsul ini bersemayam di dasar pasir akuarium. Rahasia di dalamnya baru akan terungkap pada:<br />
-                <strong className="text-[#182C3A]">{formattedTarget}</strong>
+                <strong className="text-[#182C3A] font-semibold">{formattedTarget}</strong>
               </p>
 
               <button
                 onClick={() => setLockedCapsuleView(null)}
-                className="w-full py-2 bg-[#4A6B82] hover:bg-[#3B596E] text-white text-xs font-semibold rounded-xl transition shadow-xs"
+                className="w-full py-2.5 bg-[#4A6B82] hover:bg-[#3B596E] text-white text-xs font-semibold rounded-xl transition shadow-md active:scale-98"
               >
                 Tutup &amp; Simpan Rahasia
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
 
