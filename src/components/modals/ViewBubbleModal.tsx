@@ -13,15 +13,17 @@ import {
   Hourglass,
   Calendar,
   Lock,
-  Unlock
+  Unlock,
+  CornerUpLeft
 } from 'lucide-react';
 
 interface ViewBubbleModalProps {
   message: BubbleMessage | null;
   onClose: () => void;
+  onReply?: (msg: BubbleMessage) => void;
 }
 
-export function ViewBubbleModal({ message, onClose }: ViewBubbleModalProps) {
+export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -194,6 +196,19 @@ export function ViewBubbleModal({ message, onClose }: ViewBubbleModalProps) {
           </div>
         )}
 
+        {/* Quoted Message (If this message is a reply to an earlier message) */}
+        {message.reply_to_message && (
+          <div className="mb-4 p-3 rounded-xl bg-[#F1F5F8] border-l-4 border-l-[#4A6B82] border border-[#CBD7DF] text-xs">
+            <div className="flex items-center space-x-1.5 text-[11px] font-bold text-[#4A6B82] mb-1">
+              <CornerUpLeft className="w-3.5 h-3.5" />
+              <span>Membalas {message.reply_to_sender_name || 'pesan'}:</span>
+            </div>
+            <p className="text-[#526A7A] italic line-clamp-2">
+              &ldquo;{message.reply_to_message}&rdquo;
+            </p>
+          </div>
+        )}
+
         {/* Letter Body Card */}
         {message.message && message.message !== '🎙️ Bisikan Suara Bawah Air' && (
           <div className={`p-4 md:p-5 rounded-xl border mb-5 ${
@@ -208,20 +223,36 @@ export function ViewBubbleModal({ message, onClose }: ViewBubbleModalProps) {
         )}
 
         {/* Footer & Status */}
-        <div className="flex items-center justify-between pt-3 border-t border-[#E2EAF0] text-xs">
-          <div className="flex items-center space-x-1.5 text-[#4A6B82]">
-            <Sparkles className="w-4 h-4 text-[#D8738E]" />
-            <span className="font-semibold text-[#182C3A]">+{xpReward} XP Hubungan Diperoleh</span>
+        <div className="flex items-center justify-between pt-3 border-t border-[#E2EAF0] text-xs gap-2">
+          <div className="flex items-center space-x-1.5 text-[#4A6B82] min-w-0 truncate">
+            <Sparkles className="w-4 h-4 text-[#D8738E] shrink-0" />
+            <span className="font-semibold text-[#182C3A] truncate">+{xpReward} XP Hubungan</span>
           </div>
-          <button
-            onClick={() => {
-              if (audioRef.current) audioRef.current.pause();
-              onClose();
-            }}
-            className="px-4 py-1.5 bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] font-semibold rounded-lg border border-[#CBD7DF] transition shadow-2xs"
-          >
-            Tutup
-          </button>
+
+          <div className="flex items-center space-x-2 shrink-0">
+            {onReply && (
+              <button
+                onClick={() => {
+                  if (audioRef.current) audioRef.current.pause();
+                  onClose();
+                  onReply(message);
+                }}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-[#4A6B82] to-[#D8738E] hover:opacity-95 text-white font-semibold rounded-lg shadow-sm flex items-center space-x-1.5 transition active:scale-95 text-xs"
+              >
+                <CornerUpLeft className="w-3.5 h-3.5" />
+                <span>Balas Pesan</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (audioRef.current) audioRef.current.pause();
+                onClose();
+              }}
+              className="px-3.5 py-1.5 bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] font-semibold rounded-lg border border-[#CBD7DF] transition shadow-2xs text-xs"
+            >
+              Tutup
+            </button>
+          </div>
         </div>
       </div>
     </div>

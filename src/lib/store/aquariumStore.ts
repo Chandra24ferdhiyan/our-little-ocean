@@ -606,6 +606,9 @@ export function useAquariumStore() {
       unlock_at?: string | null;
       audio_url?: string | null;
       audio_duration?: number | null;
+      reply_to_id?: string | null;
+      reply_to_sender_name?: string | null;
+      reply_to_message?: string | null;
     }
   ): { success: boolean; message: string } => {
     const trimmed = message.trim();
@@ -641,6 +644,9 @@ export function useAquariumStore() {
       unlock_at: extra?.unlock_at || null,
       audio_url: extra?.audio_url || null,
       audio_duration: extra?.audio_duration || null,
+      reply_to_id: extra?.reply_to_id || null,
+      reply_to_sender_name: extra?.reply_to_sender_name || null,
+      reply_to_message: extra?.reply_to_message || null,
     };
 
     setMessages((prev) => [optimisticMsg, ...prev]);
@@ -650,28 +656,47 @@ export function useAquariumStore() {
       const client = supabase;
       (async () => {
         try {
-          const { data: insertedRow, error } = await client
+          const payload: Record<string, any> = {
+            aquarium_id: AQUARIUM_ID,
+            sender_id: senderId,
+            recipient_id: recipientId,
+            sender_name: senderName,
+            sender_role: senderRole,
+            message: finalMessage,
+            bubble_color,
+            category,
+            status: 'pending',
+            x_pos: optimisticMsg.x_pos,
+            y_pos: optimisticMsg.y_pos,
+            drift_speed: optimisticMsg.drift_speed,
+            is_capsule: optimisticMsg.is_capsule,
+            unlock_at: optimisticMsg.unlock_at,
+            audio_url: optimisticMsg.audio_url,
+            audio_duration: optimisticMsg.audio_duration,
+            reply_to_id: optimisticMsg.reply_to_id,
+            reply_to_sender_name: optimisticMsg.reply_to_sender_name,
+            reply_to_message: optimisticMsg.reply_to_message,
+          };
+
+          let { data: insertedRow, error } = await client
             .from('bubble_messages')
-            .insert([{
-              aquarium_id: AQUARIUM_ID,
-              sender_id: senderId,
-              recipient_id: recipientId,
-              sender_name: senderName,
-              sender_role: senderRole,
-              message: finalMessage,
-              bubble_color,
-              category,
-              status: 'pending',
-              x_pos: optimisticMsg.x_pos,
-              y_pos: optimisticMsg.y_pos,
-              drift_speed: optimisticMsg.drift_speed,
-              is_capsule: optimisticMsg.is_capsule,
-              unlock_at: optimisticMsg.unlock_at,
-              audio_url: optimisticMsg.audio_url,
-              audio_duration: optimisticMsg.audio_duration,
-            }])
+            .insert([payload])
             .select()
             .single();
+
+          // Fallback if table does not yet have reply_to columns
+          if (error && (error.message?.includes('reply_to') || error.code === '42703')) {
+            delete payload.reply_to_id;
+            delete payload.reply_to_sender_name;
+            delete payload.reply_to_message;
+            const retry = await client
+              .from('bubble_messages')
+              .insert([payload])
+              .select()
+              .single();
+            insertedRow = retry.data;
+            error = retry.error;
+          }
 
           if (insertedRow && !error) {
             // Replace optimistic local message with canonical row
@@ -690,7 +715,10 @@ export function useAquariumStore() {
       })();
     }
 
-    const notif = extra?.is_capsule 
+    const isReply = !!extra?.reply_to_id;
+    const notif = isReply
+      ? `Balasan pesan berhasil dilepaskan untuk ${recipientName}.`
+      : extra?.is_capsule 
       ? `Kapsul Waktu berhasil ditenggelamkan ke dasar samudera untuk ${recipientName}.`
       : extra?.audio_url 
       ? `Bisikan Suara berhasil dilepaskan untuk ${recipientName}.`

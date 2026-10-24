@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAquarium } from '@/lib/store/AquariumContext';
-import { MessageCategory } from '@/types/aquarium';
+import { MessageCategory, BubbleMessage } from '@/types/aquarium';
 import { 
   X, 
   Send, 
@@ -19,12 +19,15 @@ import {
   RotateCcw,
   Hourglass,
   Calendar,
-  Volume2
+  Volume2,
+  CornerUpLeft
 } from 'lucide-react';
 
 interface CreateBubbleModalProps {
   isOpen: boolean;
   onClose: () => void;
+  replyToMessage?: BubbleMessage | null;
+  onClearReply?: () => void;
 }
 
 const CATEGORIES: { id: MessageCategory; label: string; icon: React.ElementType }[] = [
@@ -42,7 +45,12 @@ const COLOR_OPTIONS = [
   { id: 'bubble-amber', name: 'Morning Glow', hex: '#EAA77D' },
 ];
 
-export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
+export function CreateBubbleModal({ 
+  isOpen, 
+  onClose,
+  replyToMessage,
+  onClearReply,
+}: CreateBubbleModalProps) {
   const { partnerUser, createBubbleMessage } = useAquarium();
   
   // Message mode: 'text' | 'voice'
@@ -200,6 +208,15 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
       }
     }
 
+    const replySenderName = replyToMessage
+      ? (replyToMessage.sender_role === 'candut' ? 'Candut' : 'Saridut')
+      : null;
+    const replySnippet = replyToMessage
+      ? (replyToMessage.message && replyToMessage.message !== '🎙️ Bisikan Suara Bawah Air'
+          ? replyToMessage.message
+          : (replyToMessage.audio_url ? '🎙️ Bisikan Suara' : '⏳ Kapsul Waktu'))
+      : null;
+
     const res = createBubbleMessage(
       message, 
       selectedColor, 
@@ -209,6 +226,9 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
         unlock_at: isCapsule ? new Date(unlockDate).toISOString() : null,
         audio_url: activeTab === 'voice' ? audioBase64 : null,
         audio_duration: activeTab === 'voice' ? recordDuration : null,
+        reply_to_id: replyToMessage?.id || null,
+        reply_to_sender_name: replySenderName,
+        reply_to_message: replySnippet,
       }
     );
 
@@ -217,6 +237,7 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
       setErrorMsg('');
       handleResetRecording();
       setIsCapsule(false);
+      if (onClearReply) onClearReply();
       onClose();
     } else {
       setErrorMsg(res.message);
@@ -229,19 +250,50 @@ export function CreateBubbleModal({ isOpen, onClose }: CreateBubbleModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-[#E2EAF0]">
           <div>
-            <h2 className="font-serif text-xl text-[#182C3A] tracking-wide font-bold">Tulis Pesan Cinta</h2>
+            <h2 className="font-serif text-xl text-[#182C3A] tracking-wide font-bold">
+              {replyToMessage ? 'Balas Pesan Pasangan' : 'Tulis Pesan Cinta'}
+            </h2>
             <p className="text-xs text-[#D8738E] mt-0.5 font-medium">
               Ditujukan khusus untuk {partnerUser.display_name}
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (onClearReply) onClearReply();
+              onClose();
+            }}
             aria-label="Tutup modal"
             className="p-1.5 rounded-lg text-[#526A7A] hover:text-[#182C3A] hover:bg-[#F4F7F9] transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Quoted Reply Banner (If Replying to another message) */}
+        {replyToMessage && (
+          <div className="mt-3.5 p-3 rounded-xl bg-[#F1F5F8] border-l-4 border-l-[#D8738E] border border-[#CBD7DF] relative">
+            <div className="flex items-center justify-between text-xs font-bold text-[#182C3A] mb-1">
+              <span className="flex items-center space-x-1.5 text-[#D8738E]">
+                <CornerUpLeft className="w-3.5 h-3.5" />
+                <span>Membalas {replyToMessage.sender_role === 'candut' ? 'Candut' : 'Saridut'}</span>
+              </span>
+              {onClearReply && (
+                <button
+                  type="button"
+                  onClick={onClearReply}
+                  className="text-[11px] text-[#526A7A] hover:text-[#D8738E] font-normal transition px-1.5 py-0.5 rounded hover:bg-white/60"
+                >
+                  Batal Balas
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-[#526A7A] italic line-clamp-2">
+              &ldquo;{replyToMessage.message && replyToMessage.message !== '🎙️ Bisikan Suara Bawah Air'
+                ? replyToMessage.message
+                : (replyToMessage.audio_url ? '🎙️ Bisikan Suara Bawah Air' : '⏳ Kapsul Waktu Laut Dalam')}&rdquo;
+            </p>
+          </div>
+        )}
 
         {/* Tab Selector: Teks vs Bisikan Suara */}
         <div className="grid grid-cols-2 gap-2 mt-4 p-1 bg-[#F8FAFC] rounded-xl border border-[#E2EAF0] text-xs">

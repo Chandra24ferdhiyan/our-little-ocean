@@ -11,16 +11,18 @@ import {
   Heart, 
   Sparkles, 
   MessageCircle, 
-  LockKeyhole 
+  LockKeyhole,
+  CornerUpLeft
 } from 'lucide-react';
 
 interface MessageHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectMessage: (msg: BubbleMessage) => void;
+  onReply?: (msg: BubbleMessage) => void;
 }
 
-export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: MessageHistoryModalProps) {
+export function MessageHistoryModal({ isOpen, onClose, onSelectMessage, onReply }: MessageHistoryModalProps) {
   const { messages, currentUser } = useAquarium();
   const [filter, setFilter] = useState<'all' | 'read' | 'pending' | 'capsules'>('all');
 
@@ -197,14 +199,42 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
                     </div>
                   </div>
 
+                  {/* Quoted Message in History */}
+                  {msg.reply_to_message && (
+                    <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-[#EBF2F7]/90 border-l-3 border-[#4A6B82] text-[11px] text-[#526A7A]">
+                      <div className="flex items-center space-x-1 text-[#4A6B82] font-semibold text-[10px] mb-0.5">
+                        <CornerUpLeft className="w-3 h-3" />
+                        <span>Membalas {msg.reply_to_sender_name || 'pesan'}:</span>
+                      </div>
+                      <p className="italic line-clamp-1 text-[#526A7A]">
+                        &ldquo;{msg.reply_to_message}&rdquo;
+                      </p>
+                    </div>
+                  )}
+
                   <p className="text-xs text-[#526A7A] line-clamp-2 leading-relaxed">
                     {msg.status === 'read' || msg.recipient_id === currentUser.id || isFromMe
                       ? msg.message
                       : 'Pesan privat sedang mengapung di akuarium.'}
                   </p>
 
-                  <div className="text-right text-[10px] text-[#526A7A] mt-1.5 font-mono">
-                    {formattedDate}
+                  <div className="flex items-center justify-between text-[10px] text-[#526A7A] mt-2 pt-1.5 border-t border-black/5 font-mono">
+                    <span>{formattedDate}</span>
+                    {onReply && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClose();
+                          onReply(msg);
+                        }}
+                        title="Balas pesan ini"
+                        className="px-2.5 py-1 rounded-lg bg-[#EBF2F7] hover:bg-[#DDE8F0] text-[#4A6B82] border border-[#CBD7DF] text-[11px] font-semibold flex items-center space-x-1 transition active:scale-95 shadow-2xs font-sans"
+                      >
+                        <CornerUpLeft className="w-3 h-3" />
+                        <span>Balas</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

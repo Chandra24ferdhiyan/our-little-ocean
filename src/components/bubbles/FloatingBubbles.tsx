@@ -14,7 +14,8 @@ import {
   Volume2,
   X,
   Lock,
-  Unlock
+  Unlock,
+  CornerUpLeft
 } from 'lucide-react';
 
 interface FloatingBubblesProps {
@@ -208,12 +209,28 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
                     <img src="/icons/chat_bubble.png" alt="Buka Pesan" className="w-full h-full object-contain" />
                   </div>
                 )}
+
+                {/* Reply Indicator Badge */}
+                {msg.reply_to_message && (
+                  <div
+                    className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-[#182C3A] border border-white/70 text-white flex items-center justify-center shadow-md z-10"
+                    title={`Balasan untuk ${msg.reply_to_sender_name || 'pasangan'}`}
+                  >
+                    <CornerUpLeft className="w-2.5 h-2.5 text-white" />
+                  </div>
+                )}
               </div>
             )}
 
             {/* Hover Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none min-w-[150px] z-20">
               <div className="bg-white text-[#182C3A] text-xs px-3 py-1.5 rounded-xl border border-[#CBD7DF] text-center shadow-lg">
+                {msg.reply_to_message && (
+                  <div className="flex items-center justify-center space-x-1 text-[10px] font-semibold text-[#4A6B82] mb-0.5">
+                    <CornerUpLeft className="w-3 h-3" />
+                    <span>Balasan untuk {msg.reply_to_sender_name || 'pasangan'}</span>
+                  </div>
+                )}
                 <p className={`font-semibold ${isFromCandut ? 'text-[#4A6B82]' : 'text-[#D8738E]'}`}>
                   {isTimeCapsule ? 'Kapsul Waktu Laut Dalam' : senderDisplayName}
                 </p>

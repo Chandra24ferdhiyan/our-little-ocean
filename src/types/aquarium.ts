@@ -85,6 +85,10 @@ export interface BubbleMessage {
   // Whisper Voice Note (Feature #3)
   audio_url?: string | null; // Base64 data URL
   audio_duration?: number | null; // Duration in seconds
+  // Message Reply System
+  reply_to_id?: string | null;
+  reply_to_sender_name?: string | null;
+  reply_to_message?: string | null;
 }
 
 // Dynamic Day/Night Lighting (Feature #6)

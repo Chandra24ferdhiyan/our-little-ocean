@@ -48,11 +48,19 @@ export default function HomePage() {
   // Modals state
   const [isCreateBubbleOpen, setIsCreateBubbleOpen] = useState(false);
   const [selectedBubble, setSelectedBubble] = useState<BubbleMessage | null>(null);
+  const [replyTarget, setReplyTarget] = useState<BubbleMessage | null>(null);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isPelletOpen, setIsPelletOpen] = useState(false);
   const [isCoupleOpen, setIsCoupleOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isMilestoneRoadmapOpen, setIsMilestoneRoadmapOpen] = useState(false);
+
+  const handleStartReply = (msg: BubbleMessage) => {
+    setReplyTarget(msg);
+    setSelectedBubble(null);
+    setIsHistoryOpen(false);
+    setIsCreateBubbleOpen(true);
+  };
 
   useEffect(() => {
     initRomanticMusic();
@@ -145,12 +153,18 @@ export default function HomePage() {
       {/* Modals */}
       <CreateBubbleModal
         isOpen={isCreateBubbleOpen}
-        onClose={() => setIsCreateBubbleOpen(false)}
+        onClose={() => {
+          setIsCreateBubbleOpen(false);
+          setReplyTarget(null);
+        }}
+        replyToMessage={replyTarget}
+        onClearReply={() => setReplyTarget(null)}
       />
 
       <ViewBubbleModal
         message={selectedBubble}
         onClose={() => setSelectedBubble(null)}
+        onReply={handleStartReply}
       />
 
       <ThemeModal
@@ -172,6 +186,7 @@ export default function HomePage() {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         onSelectMessage={(msg) => setSelectedBubble(msg)}
+        onReply={handleStartReply}
       />
 
       <LevelRoadmapModal
