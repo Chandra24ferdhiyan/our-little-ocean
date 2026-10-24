@@ -59,7 +59,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#071118] via-[#0C1A24] to-[#112330] text-[#E8F1F5] relative overflow-x-hidden pb-16 md:pb-6">
+    <div className="min-h-dvh flex flex-col bg-gradient-to-b from-[#071118] via-[#0C1A24] to-[#112330] text-[#E8F1F5] relative overflow-x-hidden pb-16 lg:pb-6">
       {/* Editorial Header (Desktop Actions & Mobile Title/Audio) */}
       <Header
         onOpenCreateBubble={() => setIsCreateBubbleOpen(true)}
@@ -71,14 +71,14 @@ export default function HomePage() {
       />
 
       {/* Main Focus: Pure Cinematic Aquarium Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 py-2 sm:py-4 flex flex-col items-center justify-center">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 md:px-6 py-1.5 sm:py-3 flex flex-col items-center justify-between lg:justify-center">
         {/* Outer Aquarium Wrapper with Atmospheric Backlight Halo */}
-        <div className="relative w-full max-w-6xl mx-auto">
+        <div className="relative w-full max-w-6xl mx-auto flex-1 flex flex-col justify-center">
           {/* Ambient Backlight Halo behind the tank */}
           <div className="absolute -inset-2 sm:-inset-6 bg-gradient-to-r from-[#3B6E8C]/25 via-[#5BA4C7]/20 to-[#D8738E]/20 rounded-3xl blur-2xl pointer-events-none opacity-80" />
 
           {/* Pure Aquarium Viewport */}
-          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] max-h-[740px] rounded-2xl overflow-hidden border border-white/20 bg-[#07131B] shadow-[0_16px_50px_rgba(0,0,0,0.65)] ring-1 ring-white/10">
+          <div className="relative w-full h-[calc(100dvh-235px)] min-h-[440px] max-h-[680px] md:h-auto md:aspect-[16/10] lg:aspect-[16/9] lg:max-h-[740px] rounded-2xl overflow-hidden border border-white/20 bg-[#07131B] shadow-[0_16px_50px_rgba(0,0,0,0.65)] ring-1 ring-white/10">
             {/* Canvas 60fps Fish Simulation */}
             <AquariumCanvas />
 
@@ -94,14 +94,13 @@ export default function HomePage() {
           </div>
 
           {/* Seabed Ambient Decorations:
-              - Mobile & Tablet (< lg): Fixed di atas navbar
-              - Desktop (lg+): Anchored di luar sudut bawah bingkai akuarium
+              - Anchored di sudut bawah bingkai akuarium
           */}
           <OceanDecorations />
         </div>
 
         {/* Quick Action Ribbon (< lg: Mobile & Tablet) */}
-        <div className="lg:hidden w-full max-w-md sm:max-w-lg mt-4 sm:mt-6 flex items-center justify-between gap-2 px-1 relative z-30">
+        <div className="lg:hidden w-full max-w-md sm:max-w-lg mt-2 sm:mt-3 flex items-center justify-between gap-2 px-1 relative z-30 shrink-0">
           {/* + Tulis Pesan */}
           <button
             onClick={() => setIsCreateBubbleOpen(true)}

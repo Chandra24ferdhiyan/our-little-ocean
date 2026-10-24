@@ -11,7 +11,7 @@ export function OceanDecorations() {
           Gua Batu Lengkung (Stone Arch) + Rumput Laut (Seaweed) + Lentera Pagoda
       ========================================================================= */}
       <div 
-        className="fixed bottom-14 left-1 sm:left-3 lg:absolute lg:bottom-0 lg:left-0 lg:translate-y-3 lg:-translate-x-3 xl:translate-y-4 xl:-translate-x-5 z-30 pointer-events-none select-none flex items-end"
+        className="absolute bottom-0 left-0 translate-y-1 sm:translate-y-2 lg:translate-y-3 lg:-translate-x-3 xl:translate-y-4 xl:-translate-x-5 z-20 pointer-events-none select-none flex items-end"
         aria-hidden="true"
       >
         {/* Gua Batu Karang Lengkung (Stone Arch - Tampil di semua ukuran layar) */}
@@ -51,7 +51,7 @@ export function OceanDecorations() {
           Batu Karang & Anemon (Rock Coral) + Peti Harta Karun Emas (Treasure Chest)
       ========================================================================= */}
       <div 
-        className="fixed bottom-14 right-1 sm:right-3 lg:absolute lg:bottom-0 lg:right-0 lg:translate-y-3 lg:translate-x-3 xl:translate-y-4 xl:translate-x-5 z-30 pointer-events-none select-none flex items-end"
+        className="absolute bottom-0 right-0 translate-y-1 sm:translate-y-2 lg:translate-y-3 lg:translate-x-3 xl:translate-y-4 xl:translate-x-5 z-20 pointer-events-none select-none flex items-end"
         aria-hidden="true"
       >
         {/* Batu Karang Bawah Laut (Rock Coral - Anemon & Coral) */}
