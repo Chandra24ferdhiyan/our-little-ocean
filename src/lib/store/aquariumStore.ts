@@ -9,20 +9,52 @@ import {
   PelletTransaction, 
   UserProfile,
   TransactionType,
-  MessageCategory
+  MessageCategory,
+  DayTimeMode
 } from '@/types/aquarium';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { getRequiredXpForNextLevel } from '@/lib/level-system/levelConfig';
-import { playFeedSound, playBubblePopSound, playMilestoneSound } from '@/lib/audio/soundEffects';
+import { playFeedSound, playBubblePopSound, playMilestoneSound, playCapsuleUnlockSound } from '@/lib/audio/soundEffects';
 
 const STORAGE_KEY = 'candut_repa_ocean_state_v4';
 const ROLE_STORAGE_KEY = 'candut_repa_active_role';
+const DAY_TIME_STORAGE_KEY = 'candut_saridut_daytime_mode';
 
 // Deterministic UUIDs matching Supabase database
 export const CANDUT_ID = '00000000-0000-0000-0000-000000000001';
 export const REPA_ID = '00000000-0000-0000-0000-000000000002';
 export const COUPLE_ID = '00000000-0000-0000-0000-000000000010';
 export const AQUARIUM_ID = '00000000-0000-0000-0000-000000000100';
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const sanitizeAndFilterMessages = (msgs: BubbleMessage[]): BubbleMessage[] => {
+  const now = Date.now();
+  return msgs
+    .filter((m) => {
+      // If it's a locked time capsule, keep it safely preserved until unlocked
+      if (m.is_capsule && m.unlock_at) {
+        const unlockTime = new Date(m.unlock_at).getTime();
+        if (!isNaN(unlockTime) && unlockTime > now) {
+          return true; // Still locked in the deep ocean, preserve it!
+        }
+        // If unlocked, retain for 7 days from unlock time
+        const baseTime = !isNaN(unlockTime) ? unlockTime : new Date(m.created_at).getTime();
+        return isNaN(baseTime) || now - baseTime <= SEVEN_DAYS_MS;
+      }
+
+      if (!m.created_at) return true;
+      const t = new Date(m.created_at).getTime();
+      return isNaN(t) || now - t <= SEVEN_DAYS_MS;
+    })
+    .map((m) => {
+      const isRepa = m.sender_role === 'repa' || (m.sender_name && m.sender_name.toLowerCase().includes('repa'));
+      return {
+        ...m,
+        sender_name: isRepa ? 'Saridut' : m.sender_name,
+      };
+    });
+};
 
 const DEFAULT_CANDUT: UserProfile = {
   id: CANDUT_ID,
@@ -81,6 +113,7 @@ export function useAquariumStore() {
   const [lastClaimDate, setLastClaimDate] = useState<string>('');
   const [droppedPellets, setDroppedPellets] = useState<DroppedPellet[]>([]);
   const [milestoneCelebration, setMilestoneCelebration] = useState<number | null>(null);
+  const [dayTimeMode, setDayTimeModeState] = useState<DayTimeMode>('auto');
   const [secretCooldowns, setSecretCooldowns] = useState<Record<string, number>>({});
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
@@ -92,6 +125,11 @@ export function useAquariumStore() {
     const params = new URLSearchParams(window.location.search);
     const roleParam = (params.get('role') || params.get('as') || '').toLowerCase();
     const savedRole = localStorage.getItem(ROLE_STORAGE_KEY);
+    const savedDay = localStorage.getItem(DAY_TIME_STORAGE_KEY) as DayTimeMode;
+
+    if (savedDay && ['auto', 'dawn', 'day', 'sunset', 'night'].includes(savedDay)) {
+      setDayTimeModeState(savedDay);
+    }
 
     if (roleParam === 'saridut' || roleParam === 'repa' || (!roleParam && (savedRole === 'saridut' || savedRole === 'repa'))) {
       setCurrentUser(DEFAULT_REPA);
@@ -114,7 +152,7 @@ export function useAquariumStore() {
           setAquarium(parsed.aquarium);
         }
         if (Array.isArray(parsed.messages)) {
-          setMessages(parsed.messages);
+          setMessages(sanitizeAndFilterMessages(parsed.messages));
         }
         if (parsed.transactions) setTransactions(parsed.transactions);
         if (parsed.lastClaimDate) setLastClaimDate(parsed.lastClaimDate);
@@ -127,7 +165,7 @@ export function useAquariumStore() {
     setIsLoaded(true);
   }, []);
 
-  // 2. Initial Fetch from Cloud Supabase & Realtime WebSocket Channel
+  // 2. Initial Fetch from Cloud Supabase & Realtime WebSocket Channel (Strict 7-Day Window)
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
     const client = supabase;
@@ -144,15 +182,24 @@ export function useAquariumStore() {
           setAquarium(aquaData as AquariumData);
         }
 
+        const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
         const { data: msgData, error: msgErr } = await client
           .from('bubble_messages')
           .select('*')
           .eq('aquarium_id', AQUARIUM_ID)
+          .gte('created_at', sevenDaysAgo)
           .order('created_at', { ascending: false });
 
         if (msgData && !msgErr) {
-          setMessages(msgData as BubbleMessage[]);
+          setMessages(sanitizeAndFilterMessages(msgData as BubbleMessage[]));
         }
+
+        // Auto-cleanup expired messages older than 7 days in cloud
+        client
+          .from('bubble_messages')
+          .delete()
+          .lt('created_at', sevenDaysAgo)
+          .then(() => {});
       } catch (err) {
         console.warn('Supabase initial fetch warning:', err);
       }
@@ -176,9 +223,12 @@ export function useAquariumStore() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'bubble_messages' },
         (payload) => {
-          const newMsg = payload.new as BubbleMessage;
-          if (newMsg && newMsg.aquarium_id === AQUARIUM_ID) {
-            setMessages((prev) => [newMsg, ...prev.filter((m) => m.id !== newMsg.id)]);
+          const rawMsg = payload.new as BubbleMessage;
+          if (rawMsg && rawMsg.aquarium_id === AQUARIUM_ID) {
+            const [cleaned] = sanitizeAndFilterMessages([rawMsg]);
+            if (cleaned) {
+              setMessages((prev) => sanitizeAndFilterMessages([cleaned, ...prev.filter((m) => m.id !== cleaned.id)]));
+            }
           }
         }
       )
@@ -186,9 +236,12 @@ export function useAquariumStore() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'bubble_messages' },
         (payload) => {
-          const updated = payload.new as BubbleMessage;
-          if (updated && updated.aquarium_id === AQUARIUM_ID) {
-            setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+          const rawUpdated = payload.new as BubbleMessage;
+          if (rawUpdated && rawUpdated.aquarium_id === AQUARIUM_ID) {
+            const [cleaned] = sanitizeAndFilterMessages([rawUpdated]);
+            if (cleaned) {
+              setMessages((prev) => sanitizeAndFilterMessages(prev.map((m) => (m.id === cleaned.id ? cleaned : m))));
+            }
           }
         }
       )
@@ -227,14 +280,16 @@ export function useAquariumStore() {
           });
         }
 
+        const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
         const { data: msgData } = await client
           .from('bubble_messages')
           .select('*')
           .eq('aquarium_id', AQUARIUM_ID)
+          .gte('created_at', sevenDaysAgo)
           .order('created_at', { ascending: false });
 
         if (msgData) {
-          setMessages(msgData as BubbleMessage[]);
+          setMessages(sanitizeAndFilterMessages(msgData as BubbleMessage[]));
         }
       } catch (err) {
         // Silent background sync
@@ -257,7 +312,7 @@ export function useAquariumStore() {
     };
   }, []);
 
-  // 4. Save to localStorage for instant local loading
+  // 4. Save to localStorage for instant local loading (Persist only within 7-day retention)
   useEffect(() => {
     if (!isLoaded || typeof window === 'undefined') return;
     try {
@@ -265,7 +320,7 @@ export function useAquariumStore() {
         STORAGE_KEY,
         JSON.stringify({
           aquarium,
-          messages,
+          messages: sanitizeAndFilterMessages(messages),
           transactions,
           lastClaimDate,
           secretCooldowns,
@@ -519,15 +574,31 @@ export function useAquariumStore() {
     }
   }, []);
 
-  // Send Romantic Message Bubble (Inserts into Supabase with automatic DB UUID & broadcasts)
+  const setDayTimeMode = useCallback((mode: DayTimeMode) => {
+    setDayTimeModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DAY_TIME_STORAGE_KEY, mode);
+    }
+  }, []);
+
+  // Send Romantic Message Bubble, Time Capsule, or Voice Whisper
   const createBubbleMessage = useCallback((
     message: string, 
     bubble_color: string = 'bubble-rose',
-    category: MessageCategory = 'love'
-  ): { success: boolean; message: string } => {
-    if (!message.trim()) {
-      return { success: false, message: 'Pesan tidak boleh kosong.' };
+    category: MessageCategory = 'love',
+    extra?: {
+      is_capsule?: boolean;
+      unlock_at?: string | null;
+      audio_url?: string | null;
+      audio_duration?: number | null;
     }
+  ): { success: boolean; message: string } => {
+    const trimmed = message.trim();
+    if (!trimmed && !extra?.audio_url) {
+      return { success: false, message: 'Pesan atau rekaman suara tidak boleh kosong.' };
+    }
+
+    const finalMessage = trimmed || (extra?.audio_url ? '🎙️ Bisikan Suara Bawah Air' : '');
 
     const isCandut = currentUser.partner_role === 'candut';
     const senderId = isCandut ? CANDUT_ID : REPA_ID;
@@ -543,19 +614,23 @@ export function useAquariumStore() {
       recipient_id: recipientId,
       sender_name: senderName,
       sender_role: senderRole,
-      message: message.trim(),
+      message: finalMessage,
       bubble_color,
       category,
       status: 'pending',
-      x_pos: 25 + Math.floor(Math.random() * 50),
-      y_pos: 30 + Math.floor(Math.random() * 35),
-      drift_speed: 0.9 + Math.random() * 0.3,
+      x_pos: 20 + Math.floor(Math.random() * 60),
+      y_pos: extra?.is_capsule ? 72 + Math.floor(Math.random() * 12) : 25 + Math.floor(Math.random() * 40),
+      drift_speed: extra?.is_capsule ? 0.35 : 0.9 + Math.random() * 0.3,
       created_at: new Date().toISOString(),
+      is_capsule: !!extra?.is_capsule,
+      unlock_at: extra?.unlock_at || null,
+      audio_url: extra?.audio_url || null,
+      audio_duration: extra?.audio_duration || null,
     };
 
     setMessages((prev) => [optimisticMsg, ...prev]);
 
-    // Live insert into Supabase cloud (PostgreSQL automatically generates canonical UUID)
+    // Live insert into Supabase cloud
     if (isSupabaseConfigured && supabase) {
       const client = supabase;
       (async () => {
@@ -568,23 +643,29 @@ export function useAquariumStore() {
               recipient_id: recipientId,
               sender_name: senderName,
               sender_role: senderRole,
-              message: message.trim(),
+              message: finalMessage,
               bubble_color,
               category,
               status: 'pending',
               x_pos: optimisticMsg.x_pos,
               y_pos: optimisticMsg.y_pos,
               drift_speed: optimisticMsg.drift_speed,
+              is_capsule: optimisticMsg.is_capsule,
+              unlock_at: optimisticMsg.unlock_at,
+              audio_url: optimisticMsg.audio_url,
+              audio_duration: optimisticMsg.audio_duration,
             }])
             .select()
             .single();
 
           if (insertedRow && !error) {
             // Replace optimistic local message with canonical row
-            setMessages((prev) => [
-              insertedRow as BubbleMessage,
-              ...prev.filter((m) => m.id !== optimisticMsg.id && m.id !== (insertedRow as BubbleMessage).id),
-            ]);
+            const [cleanRow] = sanitizeAndFilterMessages([insertedRow as BubbleMessage]);
+            const targetRow = cleanRow || (insertedRow as BubbleMessage);
+            setMessages((prev) => sanitizeAndFilterMessages([
+              targetRow,
+              ...prev.filter((m) => m.id !== optimisticMsg.id && m.id !== targetRow.id),
+            ]));
           } else if (error) {
             console.error('Supabase message insert error:', error);
           }
@@ -594,7 +675,13 @@ export function useAquariumStore() {
       })();
     }
 
-    return { success: true, message: `Pesan gelembung berhasil dilepaskan untuk ${recipientName}.` };
+    const notif = extra?.is_capsule 
+      ? `Kapsul Waktu berhasil ditenggelamkan ke dasar samudera untuk ${recipientName}.`
+      : extra?.audio_url 
+      ? `Bisikan Suara berhasil dilepaskan untuk ${recipientName}.`
+      : `Pesan gelembung berhasil dilepaskan untuk ${recipientName}.`;
+
+    return { success: true, message: notif };
   }, [currentUser]);
 
   // Open / Pop Romantic Message Bubble (Strictly for intended recipient)
@@ -617,7 +704,22 @@ export function useAquariumStore() {
       };
     }
 
-    playBubblePopSound();
+    // Check if time capsule is still locked
+    if (target.is_capsule && target.unlock_at) {
+      const unlockTime = new Date(target.unlock_at).getTime();
+      if (!isNaN(unlockTime) && Date.now() < unlockTime) {
+        return { 
+          success: false, 
+          error: 'Kapsul Waktu ini masih terkunci rapat di dasar samudera. Waktu terbukanya belum tiba.' 
+        };
+      }
+    }
+
+    if (target.is_capsule) {
+      playCapsuleUnlockSound();
+    } else {
+      playBubblePopSound();
+    }
 
     const readTimestamp = new Date().toISOString();
 
@@ -634,8 +736,9 @@ export function useAquariumStore() {
 
     setMessages(updatedMessages);
 
-    // Grant +25 XP to aquarium for opening a romantic message
-    const nextXp = aquarium.current_xp + 25;
+    // Grant +50 XP for time capsule, +25 XP for normal bubble message
+    const xpReward = target.is_capsule ? 50 : 25;
+    const nextXp = aquarium.current_xp + xpReward;
     let nextLevel = aquarium.current_level;
     let remainingXp = nextXp;
     let requiredXp = getRequiredXpForNextLevel(nextLevel);
@@ -717,6 +820,8 @@ export function useAquariumStore() {
     droppedPellets,
     lastClaimDate,
     milestoneCelebration,
+    dayTimeMode,
+    setDayTimeMode,
     setMilestoneCelebration,
     switchPartner,
     claimDailyPellet,

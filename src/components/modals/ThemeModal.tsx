@@ -25,8 +25,8 @@ export function ThemeModal({ isOpen, onClose }: ThemeModalProps) {
               <img src="/icons/palette.png" alt="Tema" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h2 className="font-serif text-xl text-[#182C3A] tracking-wide font-bold">Koleksi 5 Tema Akuarium</h2>
-              <p className="text-xs text-[#526A7A]">Pilih atmosfer lingkungan bawah air</p>
+              <h2 className="font-serif text-xl text-[#182C3A] tracking-wide font-bold">Koleksi 10 Tema Akuarium HD</h2>
+              <p className="text-xs text-[#526A7A]">Pilih atmosfer lingkungan bawah air resolusi tinggi</p>
             </div>
           </div>
           <button

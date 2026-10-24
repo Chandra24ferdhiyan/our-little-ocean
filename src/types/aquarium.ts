@@ -39,7 +39,7 @@ export interface AquariumData {
   current_level: number; // 1 - 500
   current_xp: number;
   pellet_balance: number;
-  active_theme: string; // 'ocean-dream' | 'love-lagoon' | 'zen-garden' | 'midnight-ocean' | 'sunset-bay'
+  active_theme: string; // 'ocean-dream' | 'love-lagoon' | 'zen-garden' | 'midnight-ocean' | 'sunset-bay' | 'coral-sanctuary' | 'crystal-cave' | 'aurora-ocean' | 'golden-atlantis' | 'sakura-springs'
   created_at: string;
   updated_at: string;
 }
@@ -79,7 +79,16 @@ export interface BubbleMessage {
   drift_speed: number;
   created_at: string;
   read_at?: string | null;
+  // Deep Sea Time Capsule (Feature #2)
+  is_capsule?: boolean;
+  unlock_at?: string | null; // ISO datetime string
+  // Whisper Voice Note (Feature #3)
+  audio_url?: string | null; // Base64 data URL
+  audio_duration?: number | null; // Duration in seconds
 }
+
+// Dynamic Day/Night Lighting (Feature #6)
+export type DayTimeMode = 'auto' | 'dawn' | 'day' | 'sunset' | 'night';
 
 export interface ThemeConfig {
   id: string;

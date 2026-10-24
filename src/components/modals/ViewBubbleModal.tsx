@@ -1,13 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BubbleMessage } from '@/types/aquarium';
+import { playWhisperVoiceSound } from '@/lib/audio/soundEffects';
 import { 
   X, 
   Clock, 
   Sparkles, 
-  CheckCircle2, 
-  Heart 
+  Play,
+  Pause,
+  Volume2,
+  Hourglass,
+  Calendar,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 interface ViewBubbleModalProps {
@@ -16,9 +22,26 @@ interface ViewBubbleModalProps {
 }
 
 export function ViewBubbleModal({ message, onClose }: ViewBubbleModalProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    setIsPlaying(false);
+    setPlaybackTime(0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [message]);
+
   if (!message) return null;
 
   const isFromCandut = message.sender_role === 'candut';
+  const senderName = isFromCandut
+    ? 'Candut'
+    : (message.sender_role === 'repa' || (message.sender_name && message.sender_name.toLowerCase().includes('repa')) ? 'Saridut' : (message.sender_name || 'Saridut'));
+  
   const formattedDate = new Date(message.created_at).toLocaleString('id-ID', {
     day: 'numeric',
     month: 'long',
@@ -27,68 +50,174 @@ export function ViewBubbleModal({ message, onClose }: ViewBubbleModalProps) {
     minute: '2-digit',
   });
 
+  const formattedUnlock = message.unlock_at
+    ? new Date(message.unlock_at).toLocaleString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
+
+  const handleTogglePlay = () => {
+    if (!message.audio_url) return;
+
+    if (!audioRef.current) {
+      const audio = new Audio(message.audio_url);
+      audioRef.current = audio;
+
+      audio.ontimeupdate = () => {
+        setPlaybackTime(Math.floor(audio.currentTime));
+      };
+
+      audio.onended = () => {
+        setIsPlaying(false);
+        setPlaybackTime(0);
+      };
+    }
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      playWhisperVoiceSound();
+      audioRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
+  };
+
+  const xpReward = message.is_capsule ? 50 : 25;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/30 backdrop-blur-xs animate-fadeIn">
       <div className="relative w-full max-w-md bg-white border border-[#E2EAF0] rounded-2xl p-5 sm:p-6 md:p-8 shadow-2xl text-[#182C3A]">
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            if (audioRef.current) audioRef.current.pause();
+            onClose();
+          }}
           aria-label="Tutup pesan"
           className="absolute top-5 right-5 p-1.5 rounded-lg text-[#526A7A] hover:text-[#182C3A] hover:bg-[#F4F7F9] transition"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Sender Identity */}
+        {/* Sender Identity & Capsule Badge */}
         <div className="flex items-center space-x-3 mb-5">
           <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center font-serif text-lg font-bold border ${
+            className={`w-11 h-11 rounded-2xl flex items-center justify-center font-serif text-lg font-bold border shrink-0 ${
               isFromCandut
                 ? 'bg-[#EBF2F7] border-[#CBD7DF] text-[#4A6B82]'
                 : 'bg-[#FCE8EE] border-[#F3C5D1] text-[#D8738E]'
             }`}
           >
-            {message.sender_name.charAt(0)}
+            {message.is_capsule ? (
+              <img src="/icons/time_capsule.png" alt="Kapsul" className="w-7 h-7 object-contain" />
+            ) : message.audio_url ? (
+              <img src="/icons/whisper_voice.png" alt="Suara" className="w-7 h-7 object-contain" />
+            ) : (
+              senderName.charAt(0)
+            )}
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="font-serif text-lg text-[#182C3A] tracking-wide">
-                {message.sender_name}
+              <h3 className="font-serif text-lg text-[#182C3A] tracking-wide font-bold">
+                {senderName}
               </h3>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
-                isFromCandut
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${
+                message.is_capsule
+                  ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]'
+                  : message.audio_url
+                  ? 'bg-[#FCE8EE] text-[#D8738E] border-[#F3C5D1]'
+                  : isFromCandut
                   ? 'bg-[#EBF2F7] text-[#4A6B82] border-[#CBD7DF]'
                   : 'bg-[#FCE8EE] text-[#D8738E] border-[#F3C5D1]'
               }`}>
-                Pesan Personal
+                {message.is_capsule ? 'Kapsul Waktu' : message.audio_url ? 'Bisikan Suara' : 'Pesan Personal'}
               </span>
             </div>
-            <div className="flex items-center space-x-1.5 text-xs text-[#526A7A] mt-0.5">
-              <Clock className="w-3 h-3" />
-              <span>{formattedDate}</span>
+            <div className="flex items-center space-x-2 text-xs text-[#526A7A] mt-0.5">
+              <Clock className="w-3 h-3 text-[#4A6B82]" />
+              <span>Dilepas: {formattedDate}</span>
             </div>
           </div>
         </div>
 
+        {/* Time Capsule Unlock Banner */}
+        {message.is_capsule && formattedUnlock && (
+          <div className="mb-4 p-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] text-xs flex items-center space-x-2">
+            <Hourglass className="w-4 h-4 text-[#D97706] shrink-0" />
+            <span>Kapsul dibuka pada: <strong>{formattedUnlock}</strong></span>
+          </div>
+        )}
+
+        {/* Voice Note Player (Feature #3) */}
+        {message.audio_url && (
+          <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-[#EBF2F7] to-[#FCE8EE] border border-[#CBD7DF] shadow-xs">
+            <div className="flex items-center space-x-3.5">
+              <button
+                type="button"
+                onClick={handleTogglePlay}
+                className="w-12 h-12 rounded-full bg-[#4A6B82] hover:bg-[#3B596E] text-white flex items-center justify-center shadow-md transition active:scale-95 shrink-0"
+                title={isPlaying ? 'Jeda Suara' : 'Putar Bisikan Suara'}
+              >
+                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white ml-0.5" />}
+              </button>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5 text-xs font-semibold text-[#182C3A]">
+                  <span className="flex items-center space-x-1">
+                    <Volume2 className="w-3.5 h-3.5 text-[#D8738E]" />
+                    <span>Bisikan Suara Romantis</span>
+                  </span>
+                  <span className="font-mono text-[#526A7A] text-[11px]">
+                    00:{playbackTime < 10 ? `0${playbackTime}` : playbackTime} / 00:{message.audio_duration ? (message.audio_duration < 10 ? `0${message.audio_duration}` : message.audio_duration) : '15'}
+                  </span>
+                </div>
+
+                {/* Animated Soundwave Bars */}
+                <div className="flex items-center space-x-1 h-5 py-0.5">
+                  {[40, 75, 55, 95, 60, 85, 45, 90, 70, 50, 80, 65, 90, 45, 60].map((h, i) => (
+                    <div
+                      key={i}
+                      style={{ height: `${isPlaying ? Math.max(20, (h + Math.sin(playbackTime * 4 + i) * 35)) : 25}%` }}
+                      className={`flex-1 rounded-full transition-all duration-150 ${
+                        isPlaying ? 'bg-[#D8738E]' : 'bg-[#CBD7DF]'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Letter Body Card */}
-        <div className={`p-4 md:p-5 rounded-xl border mb-5 ${
-          isFromCandut
-            ? 'bg-[#F8FAFC] border-[#CBD7DF]'
-            : 'bg-[#FFF9FB] border-[#F3C5D1]'
-        }`}>
-          <p className="font-serif text-base leading-relaxed text-[#182C3A] whitespace-pre-wrap">
-            &ldquo;{message.message}&rdquo;
-          </p>
-        </div>
+        {message.message && message.message !== '🎙️ Bisikan Suara Bawah Air' && (
+          <div className={`p-4 md:p-5 rounded-xl border mb-5 ${
+            isFromCandut
+              ? 'bg-[#F8FAFC] border-[#CBD7DF]'
+              : 'bg-[#FFF9FB] border-[#F3C5D1]'
+          }`}>
+            <p className="font-serif text-base leading-relaxed text-[#182C3A] whitespace-pre-wrap">
+              &ldquo;{message.message}&rdquo;
+            </p>
+          </div>
+        )}
 
         {/* Footer & Status */}
         <div className="flex items-center justify-between pt-3 border-t border-[#E2EAF0] text-xs">
           <div className="flex items-center space-x-1.5 text-[#4A6B82]">
             <Sparkles className="w-4 h-4 text-[#D8738E]" />
-            <span className="font-semibold text-[#182C3A]">+25 XP Hubungan Diperoleh</span>
+            <span className="font-semibold text-[#182C3A]">+{xpReward} XP Hubungan Diperoleh</span>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (audioRef.current) audioRef.current.pause();
+              onClose();
+            }}
             className="px-4 py-1.5 bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] font-semibold rounded-lg border border-[#CBD7DF] transition shadow-2xs"
           >
             Tutup

@@ -1,15 +1,43 @@
 'use client';
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useAquarium } from '@/lib/store/AquariumContext';
 import { AQUARIUM_THEMES } from '@/lib/themes/themeConfig';
 import { playTapGlassSound } from '@/lib/audio/soundEffects';
+import { DayTimeMode } from '@/types/aquarium';
 import {
   SimFish,
   TapRipple,
   AmbientParticle,
   FoodPellet,
 } from '@/components/fish/FishSimulation';
+
+export function getCurrentDayPhase(mode: DayTimeMode): {
+  phase: 'dawn' | 'day' | 'sunset' | 'night';
+  label: string;
+  icon: string;
+} {
+  if (mode !== 'auto') {
+    switch (mode) {
+      case 'dawn': return { phase: 'dawn', label: 'Fajar', icon: '🌅' };
+      case 'day': return { phase: 'day', label: 'Siang', icon: '☀️' };
+      case 'sunset': return { phase: 'sunset', label: 'Senja', icon: '🌇' };
+      case 'night': return { phase: 'night', label: 'Malam', icon: '🌙' };
+    }
+  }
+  const now = new Date();
+  const h = now.getHours() + now.getMinutes() / 60;
+  if (h >= 5.0 && h < 7.0) {
+    return { phase: 'dawn', label: 'Fajar', icon: '🌅' };
+  }
+  if (h >= 7.0 && h < 16.5) {
+    return { phase: 'day', label: 'Siang', icon: '☀️' };
+  }
+  if (h >= 16.5 && h < 18.75) {
+    return { phase: 'sunset', label: 'Senja', icon: '🌇' };
+  }
+  return { phase: 'night', label: 'Malam', icon: '🌙' };
+}
 
 interface AquariumCanvasProps {
   onTapLocation?: (x: number, y: number) => void;
@@ -18,13 +46,15 @@ interface AquariumCanvasProps {
 export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { aquarium, droppedPellets, consumePellet } = useAquarium();
+  const { aquarium, droppedPellets, consumePellet, dayTimeMode, setDayTimeMode } = useAquarium();
+  const [isDayMenuOpen, setIsDayMenuOpen] = useState(false);
 
   const simState = useRef<{
     candut: SimFish;
     repa: SimFish;
     ripples: TapRipple[];
     particles: AmbientParticle[];
+    nightPlankton: { x: number; y: number; r: number; alpha: number; speedY: number; speedX: number; color: string }[];
     pellets: FoodPellet[];
     lastTap: { x: number; y: number; active: boolean; timer: number } | null;
     causticOffset: number;
@@ -34,6 +64,7 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     repa: new SimFish('repa', 460, 280),
     ripples: [],
     particles: [],
+    nightPlankton: [],
     pellets: [],
     lastTap: null,
     causticOffset: 0,
@@ -192,6 +223,22 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       }
     }
 
+    // Seed 25 bioluminescent night plankton
+    if (simState.current.nightPlankton.length === 0) {
+      const colors = ['#5EEAD4', '#99F6E4', '#F472B6', '#C084FC', '#67E8F9'];
+      for (let i = 0; i < 25; i++) {
+        simState.current.nightPlankton.push({
+          x: Math.random() * 800,
+          y: Math.random() * 500,
+          r: 1.2 + Math.random() * 1.8,
+          alpha: 0.35 + Math.random() * 0.45,
+          speedY: -(0.12 + Math.random() * 0.18),
+          speedX: (Math.random() - 0.5) * 0.2,
+          color: colors[i % colors.length],
+        });
+      }
+    }
+
     const render = () => {
       const dpr = window.devicePixelRatio || 1;
       const width = canvas.width / dpr;
@@ -211,6 +258,8 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
 
       const theme = AQUARIUM_THEMES[aquarium.active_theme] || AQUARIUM_THEMES['ocean-dream'];
       const level = aquarium.current_level;
+      const dayInfo = getCurrentDayPhase(dayTimeMode);
+      const phase = dayInfo.phase;
 
       // --- 1. Background Environmental Artwork ---
       const activeThemeImg = themeAssetsRef.current[theme.id];
@@ -264,14 +313,48 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
         ctx.fillRect(0, 0, width, height);
       }
 
-      // --- 2. Dynamic Moving Caustic Sunbeams (Shimmer Waves) ---
+      // --- 1.1 Dynamic Day/Night Lighting Wash (Feature #6) ---
+      if (phase === 'dawn') {
+        const dawnGrad = ctx.createLinearGradient(0, 0, width, height);
+        dawnGrad.addColorStop(0, 'rgba(255, 185, 150, 0.20)');
+        dawnGrad.addColorStop(0.5, 'rgba(240, 200, 180, 0.10)');
+        dawnGrad.addColorStop(1, 'rgba(180, 140, 160, 0.08)');
+        ctx.fillStyle = dawnGrad;
+        ctx.fillRect(0, 0, width, height);
+      } else if (phase === 'sunset') {
+        const sunsetGrad = ctx.createLinearGradient(0, 0, 0, height);
+        sunsetGrad.addColorStop(0, 'rgba(255, 130, 60, 0.24)');
+        sunsetGrad.addColorStop(0.5, 'rgba(216, 115, 142, 0.16)');
+        sunsetGrad.addColorStop(1, 'rgba(120, 50, 80, 0.14)');
+        ctx.fillStyle = sunsetGrad;
+        ctx.fillRect(0, 0, width, height);
+      } else if (phase === 'night') {
+        const nightGrad = ctx.createLinearGradient(0, 0, 0, height);
+        nightGrad.addColorStop(0, 'rgba(10, 22, 50, 0.48)');
+        nightGrad.addColorStop(0.6, 'rgba(7, 16, 38, 0.44)');
+        nightGrad.addColorStop(1, 'rgba(4, 10, 24, 0.52)');
+        ctx.fillStyle = nightGrad;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      // --- 2. Dynamic Moving Caustic Sunbeams (Shimmer Waves with Day/Night Tints) ---
       simState.current.causticOffset += 0.012;
       const cOffset = simState.current.causticOffset;
+
+      let causticRayColor = theme.causticsColor;
+      if (phase === 'dawn') {
+        causticRayColor = 'rgba(255, 220, 190, 0.42)';
+      } else if (phase === 'sunset') {
+        causticRayColor = 'rgba(255, 195, 120, 0.48)';
+      } else if (phase === 'night') {
+        causticRayColor = 'rgba(190, 220, 255, 0.22)';
+      }
+
       ctx.save();
       for (let i = 0; i < 4; i++) {
         const rayX = (width * 0.28 * i + Math.sin(cOffset + i * 1.3) * 28 + width * 0.12) % width;
         const rayGrad = ctx.createLinearGradient(rayX, 0, rayX + 60, height);
-        rayGrad.addColorStop(0, theme.causticsColor);
+        rayGrad.addColorStop(0, causticRayColor);
         rayGrad.addColorStop(0.75, 'rgba(255, 255, 255, 0)');
         ctx.fillStyle = rayGrad;
         ctx.beginPath();
@@ -283,6 +366,27 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
         ctx.fill();
       }
       ctx.restore();
+
+      // --- 2.1 Bioluminescent Night Plankton (Firefly Motes at Night) ---
+      if (phase === 'night') {
+        ctx.save();
+        simState.current.nightPlankton.forEach((p) => {
+          p.y += p.speedY;
+          p.x += p.speedX;
+          if (p.y < -10) p.y = height + 10;
+          if (p.x < -10) p.x = width + 10;
+          if (p.x > width + 10) p.x = -10;
+
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8;
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.alpha * (0.6 + Math.sin(cOffset * 3 + p.x) * 0.4);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
 
       const sandHeight = 48;
 
@@ -500,13 +604,68 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, [aquarium.active_theme, aquarium.current_level, consumePellet]);
+  }, [aquarium.active_theme, aquarium.current_level, consumePellet, dayTimeMode]);
+
+  const activePhase = getCurrentDayPhase(dayTimeMode);
 
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full select-none overflow-hidden rounded-2xl border border-[#CBD7DF] cursor-pointer shadow-inner"
     >
+      {/* Dynamic Day/Night Lighting Floating Selector */}
+      <div className="absolute top-3.5 left-3.5 z-20">
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDayMenuOpen(!isDayMenuOpen);
+            }}
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-white/85 hover:bg-white text-[#182C3A] text-xs font-semibold backdrop-blur-xs border border-[#CBD7DF] shadow-xs transition active:scale-95"
+            title="Pencahayaan Waktu Nyata Bawah Laut"
+          >
+            <span className="text-sm">{activePhase.icon}</span>
+            <span className="text-[11px] font-medium text-[#4A6B82] hidden sm:inline">
+              {activePhase.label}
+            </span>
+          </button>
+
+          {isDayMenuOpen && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full left-0 mt-1.5 w-48 bg-white/95 backdrop-blur-md rounded-xl border border-[#CBD7DF] shadow-xl p-1.5 z-30 animate-fadeIn text-xs"
+            >
+              <div className="px-2 py-1 text-[10px] uppercase font-bold tracking-wider text-[#526A7A] border-b border-[#E2EAF0] mb-1">
+                Pencahayaan Samudra
+              </div>
+              {[
+                { id: 'auto' as const, label: 'Otomatis (Jam Asli)', icon: '🕒' },
+                { id: 'dawn' as const, label: 'Fajar (Subuh)', icon: '🌅' },
+                { id: 'day' as const, label: 'Siang (Cerah)', icon: '☀️' },
+                { id: 'sunset' as const, label: 'Senja (Keemasan)', icon: '🌇' },
+                { id: 'night' as const, label: 'Malam (Bioluminesensi)', icon: '🌙' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    setDayTimeMode(opt.id);
+                    setIsDayMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg transition text-left text-xs ${
+                    dayTimeMode === opt.id
+                      ? 'bg-[#EBF2F7] text-[#4A6B82] font-semibold'
+                      : 'text-[#182C3A] hover:bg-[#F4F7F9]'
+                  }`}
+                >
+                  <span className="text-sm">{opt.icon}</span>
+                  <span className="truncate">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <canvas
         ref={canvasRef}
         onClick={handleTap}

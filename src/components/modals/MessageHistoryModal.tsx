@@ -22,13 +22,14 @@ interface MessageHistoryModalProps {
 
 export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: MessageHistoryModalProps) {
   const { messages, currentUser } = useAquarium();
-  const [filter, setFilter] = useState<'all' | 'read' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'read' | 'pending' | 'capsules'>('all');
 
   if (!isOpen) return null;
 
   const filteredMessages = messages.filter((m) => {
     if (filter === 'read') return m.status === 'read';
     if (filter === 'pending') return m.status === 'pending';
+    if (filter === 'capsules') return !!m.is_capsule;
     return true;
   });
 
@@ -57,8 +58,11 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
               <img src="/icons/chat_bubble.png" alt="Pesan Cinta" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h2 className="font-serif text-xl text-[#182C3A] tracking-wide">Riwayat Pesan Cinta</h2>
-              <p className="text-xs text-[#526A7A]">Arsip kenangan dan pesan gelembung</p>
+              <h2 className="font-serif text-xl text-[#182C3A] tracking-wide font-bold">Riwayat Pesan Cinta</h2>
+              <div className="flex items-center space-x-1.5 text-xs text-[#526A7A] mt-0.5">
+                <Clock className="w-3.5 h-3.5 text-[#4A6B82]" />
+                <span>Pesan tersimpan otomatis selama 7 hari</span>
+              </div>
             </div>
           </div>
           <button
@@ -71,10 +75,10 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
         </div>
 
         {/* Filter Tabs */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-4 p-1 bg-[#F8FAFC] rounded-xl border border-[#E2EAF0] text-xs">
+        <div className="grid grid-cols-4 gap-1 sm:gap-1.5 mt-4 p-1 bg-[#F8FAFC] rounded-xl border border-[#E2EAF0] text-[11px] sm:text-xs">
           <button
             onClick={() => setFilter('all')}
-            className={`py-2 px-1.5 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
+            className={`py-2 px-1 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
               filter === 'all'
                 ? 'bg-white text-[#182C3A] border border-[#CBD7DF] shadow-xs'
                 : 'text-[#526A7A] hover:text-[#182C3A]'
@@ -84,7 +88,7 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
           </button>
           <button
             onClick={() => setFilter('read')}
-            className={`py-2 px-1.5 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
+            className={`py-2 px-1 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
               filter === 'read'
                 ? 'bg-white text-[#182C3A] border border-[#CBD7DF] shadow-xs'
                 : 'text-[#526A7A] hover:text-[#182C3A]'
@@ -94,13 +98,23 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
           </button>
           <button
             onClick={() => setFilter('pending')}
-            className={`py-2 px-1.5 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
+            className={`py-2 px-1 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
               filter === 'pending'
                 ? 'bg-white text-[#182C3A] border border-[#CBD7DF] shadow-xs'
                 : 'text-[#526A7A] hover:text-[#182C3A]'
             }`}
           >
-            <span className="truncate">Akuarium ({messages.filter((m) => m.status === 'pending').length})</span>
+            <span className="truncate">Mengapung ({messages.filter((m) => m.status === 'pending').length})</span>
+          </button>
+          <button
+            onClick={() => setFilter('capsules')}
+            className={`py-2 px-1 rounded-lg font-semibold transition min-h-[36px] flex items-center justify-center text-center ${
+              filter === 'capsules'
+                ? 'bg-white text-[#B45309] border border-[#FDE68A] shadow-xs'
+                : 'text-[#526A7A] hover:text-[#182C3A]'
+            }`}
+          >
+            <span className="truncate">Kapsul ({messages.filter((m) => m.is_capsule).length})</span>
           </button>
         </div>
 
@@ -129,18 +143,45 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
                     }
                   }}
                   className={`p-3.5 rounded-xl border transition cursor-pointer ${
-                    msg.status === 'read'
+                    msg.is_capsule
+                      ? 'bg-[#FFFDF7] border-[#FDE68A] hover:border-[#D97706]'
+                      : msg.status === 'read'
                       ? 'bg-[#F8FAFC] border-[#E2EAF0] hover:border-[#CBD7DF]'
                       : 'bg-[#FFF9FB] border-[#F3C5D1] hover:border-[#D8738E]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center space-x-2">
-                      {getCategoryIcon(msg.category || 'love')}
+                      {msg.is_capsule ? (
+                        <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                          <img src="/icons/time_capsule.png" alt="Kapsul" className="w-full h-full object-contain" />
+                        </div>
+                      ) : msg.audio_url ? (
+                        <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                          <img src="/icons/whisper_voice.png" alt="Suara" className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        getCategoryIcon(msg.category || 'love')
+                      )}
+                      
                       <span className="text-xs font-semibold text-[#182C3A]">
-                        {isFromMe ? `Anda kepada ${msg.sender_role === 'candut' ? 'Saridut' : 'Candut'}` : msg.sender_name}
+                        {isFromMe
+                          ? `Anda kepada ${msg.sender_role === 'candut' ? 'Saridut' : 'Candut'}`
+                          : (msg.sender_role === 'repa' || (msg.sender_name && msg.sender_name.toLowerCase().includes('repa')) ? 'Saridut' : msg.sender_name)}
                       </span>
+
+                      {msg.is_capsule && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]">
+                          Kapsul
+                        </span>
+                      )}
+                      {msg.audio_url && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FCE8EE] text-[#D8738E] border border-[#F3C5D1]">
+                          Suara
+                        </span>
+                      )}
                     </div>
+
                     <div className="flex items-center space-x-1.5 text-[11px]">
                       {msg.status === 'read' ? (
                         <span className="flex items-center space-x-1 text-[#4A6B82] font-medium">
@@ -150,7 +191,7 @@ export function MessageHistoryModal({ isOpen, onClose, onSelectMessage }: Messag
                       ) : (
                         <span className="flex items-center space-x-1 text-[#D8738E] font-medium">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>Belum Dibuka</span>
+                          <span>{msg.is_capsule ? 'Menunggu Waktu' : 'Belum Dibuka'}</span>
                         </span>
                       )}
                     </div>

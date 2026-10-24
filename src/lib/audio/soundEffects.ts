@@ -252,3 +252,81 @@ export function playMilestoneSound() {
     osc.stop(noteTime + 0.65);
   });
 }
+
+/**
+ * Procedural Time Capsule Unlock Sound:
+ * Grand ethereal chord with deep resonant underwater chime
+ */
+export function playCapsuleUnlockSound() {
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.4 * globalVolume, now);
+  master.connect(ctx.destination);
+
+  // Deep underwater bell resonance
+  const subOsc = ctx.createOscillator();
+  const subGain = ctx.createGain();
+  subOsc.type = 'triangle';
+  subOsc.frequency.setValueAtTime(196, now); // G3
+  subGain.gain.setValueAtTime(0.5, now);
+  subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+  subOsc.connect(subGain);
+  subGain.connect(master);
+  subOsc.start(now);
+  subOsc.stop(now + 1.2);
+
+  // Shimmering celestial glockenspiel arpeggio
+  const notes = [392.00, 493.88, 587.33, 783.99, 987.77, 1174.66]; // G4, B4, D5, G5, B5, D6
+  notes.forEach((freq, idx) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const noteTime = now + 0.1 + idx * 0.07;
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, noteTime);
+
+    gain.gain.setValueAtTime(0.01, noteTime);
+    gain.gain.linearRampToValueAtTime(0.35, noteTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.8);
+
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(noteTime);
+    osc.stop(noteTime + 0.85);
+  });
+}
+
+/**
+ * Procedural Voice Note / Whisper Start Sound:
+ * Intimate warm bubble whoosh when opening audio voice note
+ */
+export function playWhisperVoiceSound() {
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.3 * globalVolume, now);
+  master.connect(ctx.destination);
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(440, now);
+  osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.15); // A4 to E5
+
+  gain.gain.setValueAtTime(0.01, now);
+  gain.gain.linearRampToValueAtTime(0.4, now + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(now);
+  osc.stop(now + 0.26);
+}
+

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAquarium } from '@/lib/store/AquariumContext';
 import { BubbleMessage } from '@/types/aquarium';
 import { 
@@ -9,7 +9,11 @@ import {
   Clock, 
   LockKeyhole, 
   MessageCircle, 
-  FileText 
+  Hourglass,
+  Volume2,
+  X,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 interface FloatingBubblesProps {
@@ -19,21 +23,43 @@ interface FloatingBubblesProps {
 export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
   const { messages, currentUser, openBubbleMessage } = useAquarium();
   const [blockedHint, setBlockedHint] = useState<{ id: string; text: string } | null>(null);
+  const [lockedCapsuleView, setLockedCapsuleView] = useState<BubbleMessage | null>(null);
+  const [now, setNow] = useState<number>(0);
+
+  // Ticker for live time capsule countdown
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const pendingBubbles = messages.filter((m) => m.status === 'pending');
 
   const handleBubbleClick = (e: React.MouseEvent, msg: BubbleMessage) => {
     e.stopPropagation();
 
+    // 1. Time Capsule Check
+    if (msg.is_capsule && msg.unlock_at) {
+      const unlockTime = new Date(msg.unlock_at).getTime();
+      if (!isNaN(unlockTime) && now < unlockTime) {
+        // Still locked: show the intimate countdown modal to either partner
+        setLockedCapsuleView(msg);
+        return;
+      }
+    }
+
+    // 2. Recipient Identity Lock Check
     if (msg.recipient_id !== currentUser.id) {
+      const partnerName = msg.sender_role === 'candut' ? 'Saridut' : 'Candut';
       setBlockedHint({
         id: msg.id,
-        text: `Pesan ditujukan khusus untuk ${msg.sender_role === 'candut' ? 'Saridut' : 'Candut'}. Tunggu pasanganmu membukanya.`,
+        text: `Pesan ditujukan khusus untuk ${partnerName}. Tunggu pasanganmu membukanya.`,
       });
       setTimeout(() => setBlockedHint(null), 3000);
       return;
     }
 
+    // 3. Open Message
     const res = openBubbleMessage(msg.id);
     if (res.success && res.message) {
       onOpenBubble(res.message);
@@ -55,14 +81,33 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
     }
   };
 
+  // Helper to format remaining time
+  const formatRemainingTime = (targetIso: string) => {
+    const currentMs = now > 0 ? now : (typeof window !== 'undefined' ? Date.now() : 0);
+    const diff = Math.max(0, new Date(targetIso).getTime() - currentMs);
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    return { days, hours, minutes, seconds, isDone: diff <= 0 };
+  };
+
   return (
     <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
       {pendingBubbles.map((msg, index) => {
         const isRecipient = msg.recipient_id === currentUser.id;
         const isFromCandut = msg.sender_role === 'candut';
+        const senderDisplayName = isFromCandut
+          ? 'Candut'
+          : (msg.sender_role === 'repa' || (msg.sender_name && msg.sender_name.toLowerCase().includes('repa')) ? 'Saridut' : (msg.sender_name || 'Saridut'));
+
+        const isTimeCapsule = !!msg.is_capsule;
+        const isCapsuleLocked = isTimeCapsule && msg.unlock_at && (now > 0 ? now < new Date(msg.unlock_at).getTime() : true);
+        const hasVoiceNote = !!msg.audio_url;
 
         const floatDelay = (index * 0.8) % 3;
-        const floatDuration = 4.5 + (index % 2);
+        const floatDuration = isTimeCapsule ? 6.5 : (4.5 + (index % 2));
 
         return (
           <div
@@ -75,54 +120,109 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
             className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group"
             onClick={(e) => handleBubbleClick(e, msg)}
           >
-            {/* Iridescent Realistic Glass Bubble */}
-            <div
-              className={`relative flex flex-col items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-full transition-transform duration-200 group-hover:scale-105 ${
-                isFromCandut
-                  ? 'bg-[#4A6B82]/25 border border-[#4A6B82]/50 shadow-sm'
-                  : 'bg-[#D8738E]/25 border border-[#D8738E]/50 shadow-sm'
-              } backdrop-blur-[2px]`}
-            >
-              {/* Internal Glass Highlight */}
-              <div className="absolute top-2 left-3 w-4 h-2 bg-white/60 rounded-full -rotate-45" />
+            {/* Iridescent Realistic Glass Bubble OR Time Capsule Bottle */}
+            {isTimeCapsule ? (
+              <div
+                className={`relative flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300 group-hover:scale-110 ${
+                  isCapsuleLocked 
+                    ? 'bg-amber-950/25 border border-amber-300/60 shadow-lg' 
+                    : 'bg-amber-500/30 border border-amber-300 ring-2 ring-amber-300/50 shadow-xl animate-pulse'
+                } backdrop-blur-xs`}
+              >
+                {/* 3D Time Capsule Icon */}
+                <div className="w-12 h-12 md:w-14 md:h-14 relative flex items-center justify-center">
+                  <img 
+                    src="/icons/time_capsule.png" 
+                    alt="Kapsul Waktu" 
+                    className="w-full h-full object-contain drop-shadow-md" 
+                  />
+                  {isCapsuleLocked ? (
+                    <div className="absolute -bottom-1 -right-1 bg-amber-500 text-white p-1 rounded-full shadow-xs">
+                      <Lock className="w-2.5 h-2.5" />
+                    </div>
+                  ) : (
+                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full shadow-xs animate-bounce">
+                      <Unlock className="w-2.5 h-2.5" />
+                    </div>
+                  )}
+                </div>
 
-              {/* Category SVG Icon */}
-              <div className="mb-0.5">
-                {getCategoryIcon(msg.category || 'love')}
+                <span className="text-[9px] font-bold tracking-wider uppercase text-amber-100 drop-shadow-md mt-0.5">
+                  {isCapsuleLocked ? 'Kapsul Waktu' : 'Kapsul Terbuka!'}
+                </span>
               </div>
+            ) : (
+              /* Regular Romantic Bubble */
+              <div
+                className={`relative flex flex-col items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-full transition-transform duration-200 group-hover:scale-105 ${
+                  isFromCandut
+                    ? 'bg-[#4A6B82]/25 border border-[#4A6B82]/50 shadow-sm'
+                    : 'bg-[#D8738E]/25 border border-[#D8738E]/50 shadow-sm'
+                } backdrop-blur-[2px]`}
+              >
+                {/* Internal Glass Highlight */}
+                <div className="absolute top-2 left-3 w-4 h-2 bg-white/60 rounded-full -rotate-45" />
 
-              {/* Typographic Sender Label */}
-              <span className="text-[10px] font-bold tracking-wider uppercase text-white drop-shadow-sm">
-                {msg.sender_name}
-              </span>
-
-              {/* Private Lock Indicator */}
-              {!isRecipient && (
-                <div
-                  className="absolute -top-1.5 -right-1.5 w-6 h-6 flex items-center justify-center drop-shadow-md"
-                  title="Pesan privat untuk pasangan"
-                >
-                  <img src="/icons/heart_lock.png" alt="Privat" className="w-full h-full object-contain" />
+                {/* Category SVG Icon or Voice Conch Icon */}
+                <div className="mb-0.5">
+                  {hasVoiceNote ? (
+                    <img src="/icons/whisper_voice.png" alt="Bisikan Suara" className="w-6 h-6 object-contain drop-shadow-xs" />
+                  ) : (
+                    getCategoryIcon(msg.category || 'love')
+                  )}
                 </div>
-              )}
 
-              {/* Recipient Action Indicator */}
-              {isRecipient && (
-                <div
-                  className="absolute -top-1.5 -right-1.5 w-6 h-6 flex items-center justify-center drop-shadow-md"
-                  title="Ketuk untuk membuka pesan"
-                >
-                  <img src="/icons/chat_bubble.png" alt="Buka Pesan" className="w-full h-full object-contain" />
-                </div>
-              )}
-            </div>
+                {/* Typographic Sender Label */}
+                <span className="text-[10px] font-bold tracking-wider uppercase text-white drop-shadow-sm">
+                  {senderDisplayName}
+                </span>
+
+                {/* Voice Note Indicator */}
+                {hasVoiceNote && (
+                  <div
+                    className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-[#D8738E] text-white flex items-center justify-center shadow-xs"
+                    title="Pesan Bisikan Suara"
+                  >
+                    <Volume2 className="w-2.5 h-2.5" />
+                  </div>
+                )}
+
+                {/* Private Lock Indicator */}
+                {!isRecipient && (
+                  <div
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 flex items-center justify-center drop-shadow-md"
+                    title="Pesan privat untuk pasangan"
+                  >
+                    <img src="/icons/heart_lock.png" alt="Privat" className="w-full h-full object-contain" />
+                  </div>
+                )}
+
+                {/* Recipient Action Indicator */}
+                {isRecipient && (
+                  <div
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 flex items-center justify-center drop-shadow-md"
+                    title="Ketuk untuk membuka pesan"
+                  >
+                    <img src="/icons/chat_bubble.png" alt="Buka Pesan" className="w-full h-full object-contain" />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Hover Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none min-w-[150px] z-20">
               <div className="bg-white text-[#182C3A] text-xs px-3 py-1.5 rounded-xl border border-[#CBD7DF] text-center shadow-lg">
-                <p className={`font-semibold ${isFromCandut ? 'text-[#4A6B82]' : 'text-[#D8738E]'}`}>{msg.sender_name}</p>
+                <p className={`font-semibold ${isFromCandut ? 'text-[#4A6B82]' : 'text-[#D8738E]'}`}>
+                  {isTimeCapsule ? 'Kapsul Waktu Laut Dalam' : senderDisplayName}
+                </p>
                 <p className="text-[11px] text-[#526A7A]">
-                  {isRecipient ? 'Ketuk untuk membuka' : 'Menunggu pasangan'}
+                  {isCapsuleLocked 
+                    ? 'Terkunci hingga waktunya tiba' 
+                    : hasVoiceNote 
+                    ? 'Bisikan suara siap didengar'
+                    : isRecipient 
+                    ? 'Ketuk untuk membuka' 
+                    : 'Menunggu pasangan'}
                 </p>
               </div>
               <div className="w-2 h-2 bg-white rotate-45 -mt-1 border-r border-b border-[#CBD7DF]" />
@@ -137,6 +237,80 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
           </div>
         );
       })}
+
+      {/* Feature #2: Interactive Locked Time Capsule Countdown Modal */}
+      {lockedCapsuleView && lockedCapsuleView.unlock_at && (() => {
+        const time = formatRemainingTime(lockedCapsuleView.unlock_at);
+        const isFromCandut = lockedCapsuleView.sender_role === 'candut';
+        const sender = isFromCandut ? 'Candut' : 'Saridut';
+        const formattedTarget = new Date(lockedCapsuleView.unlock_at).toLocaleString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/40 backdrop-blur-xs animate-fadeIn pointer-events-auto">
+            <div className="relative w-full max-w-sm bg-white border border-[#CBD7DF] rounded-2xl p-6 shadow-2xl text-[#182C3A] text-center">
+              <button
+                onClick={() => setLockedCapsuleView(null)}
+                className="absolute top-4 right-4 p-1 rounded-lg text-[#526A7A] hover:text-[#182C3A] hover:bg-[#F4F7F9]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="w-20 h-20 mx-auto mb-3 relative flex items-center justify-center">
+                <img 
+                  src="/icons/time_capsule.png" 
+                  alt="Kapsul Waktu" 
+                  className="w-full h-full object-contain drop-shadow-lg animate-pulse" 
+                />
+              </div>
+
+              <h3 className="font-serif text-lg font-bold text-[#182C3A]">
+                Kapsul Waktu Laut Dalam
+              </h3>
+              <p className="text-xs text-[#526A7A] mt-1">
+                Disimpan oleh <strong>{sender}</strong> dengan penuh cinta
+              </p>
+
+              {/* Countdown Ticker Cards */}
+              <div className="grid grid-cols-4 gap-2 my-5 p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A]">
+                <div>
+                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.days}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium">HARI</div>
+                </div>
+                <div>
+                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.hours}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium">JAM</div>
+                </div>
+                <div>
+                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.minutes}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium">MENIT</div>
+                </div>
+                <div>
+                  <div className="text-lg font-mono font-bold text-[#B45309]">{time.seconds}</div>
+                  <div className="text-[10px] text-[#92400E] font-medium">DETIK</div>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#526A7A] leading-relaxed mb-4">
+                Kapsul ini bersemayam di dasar pasir akuarium. Rahasia di dalamnya baru akan terungkap pada:<br />
+                <strong className="text-[#182C3A]">{formattedTarget}</strong>
+              </p>
+
+              <button
+                onClick={() => setLockedCapsuleView(null)}
+                className="w-full py-2 bg-[#4A6B82] hover:bg-[#3B596E] text-white text-xs font-semibold rounded-xl transition shadow-xs"
+              >
+                Tutup &amp; Simpan Rahasia
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       <style jsx>{`
         @keyframes editorialBubbleFloat {
