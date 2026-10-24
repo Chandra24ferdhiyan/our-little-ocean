@@ -19,7 +19,7 @@ export function LevelRoadmapModal({ isOpen, onClose }: LevelRoadmapModalProps) {
   const requiredXp = getRequiredXpForNextLevel(currentLevel);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/40 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/60 backdrop-blur-sm animate-fadeIn">
       <div className="relative w-full max-w-lg bg-white border border-[#E2EAF0] rounded-2xl shadow-2xl text-[#182C3A] max-h-[88vh] flex flex-col overflow-hidden">
         
         {/* Sticky Header */}

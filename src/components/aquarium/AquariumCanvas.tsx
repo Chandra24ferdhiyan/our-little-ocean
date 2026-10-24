@@ -59,6 +59,8 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     lastTap: { x: number; y: number; active: boolean; timer: number } | null;
     causticOffset: number;
     plantPhase: number;
+    kissHearts: { x: number; y: number; alpha: number; scale: number; vy: number }[];
+    lastKiss: number;
   }>({
     candut: new SimFish('candut', 220, 260),
     repa: new SimFish('repa', 460, 280),
@@ -69,6 +71,8 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     lastTap: null,
     causticOffset: 0,
     plantPhase: 0,
+    kissHearts: [],
+    lastKiss: 0,
   });
 
   const themeAssetsRef = useRef<Record<string, HTMLImageElement>>({});
@@ -582,8 +586,55 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       candut.update(width, height, repa, simState.current.pellets, simState.current.lastTap, level);
       repa.update(width, height, candut, simState.current.pellets, simState.current.lastTap, level);
 
+      // Level 201+ Gesture Sapaan Ciuman Hidung saat Berpapasan
+      if (level >= 201) {
+        const fishDist = Math.hypot(candut.x - repa.x, candut.y - repa.y);
+        const now = Date.now();
+        if (fishDist < 46 && now - simState.current.lastKiss > 6000) {
+          simState.current.lastKiss = now;
+          simState.current.kissHearts.push({
+            x: (candut.x + repa.x) / 2,
+            y: (candut.y + repa.y) / 2 - 12,
+            alpha: 1.0,
+            scale: 0.8,
+            vy: -0.9,
+          });
+        }
+      }
+
       candut.draw(ctx, level, candutSprite, width);
       repa.draw(ctx, level, repaSprite, width);
+
+      // Render Kissing Heart Particles
+      if (simState.current.kissHearts && simState.current.kissHearts.length > 0) {
+        ctx.save();
+        simState.current.kissHearts.forEach((h) => {
+          h.y += h.vy;
+          h.alpha -= 0.018;
+          h.scale += 0.006;
+
+          if (h.alpha > 0) {
+            ctx.save();
+            ctx.translate(h.x, h.y);
+            ctx.scale(h.scale, h.scale);
+            ctx.globalAlpha = Math.max(0, h.alpha);
+            ctx.fillStyle = '#D8738E';
+            ctx.shadowColor = 'rgba(216, 115, 142, 0.6)';
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.moveTo(0, -2);
+            ctx.bezierCurveTo(-4, -7, -9, -4, -9, 2);
+            ctx.bezierCurveTo(-9, 7, -4, 11, 0, 14);
+            ctx.bezierCurveTo(4, 11, 9, 7, 9, 2);
+            ctx.bezierCurveTo(9, -4, 4, -7, 0, -2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+        });
+        simState.current.kissHearts = simState.current.kissHearts.filter((h) => h.alpha > 0);
+        ctx.restore();
+      }
 
       // --- 10. Subtle Foreground Vignette Sheen ---
       ctx.save();

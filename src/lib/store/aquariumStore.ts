@@ -56,6 +56,15 @@ export const sanitizeAndFilterMessages = (msgs: BubbleMessage[]): BubbleMessage[
     });
 };
 
+export const getMilestonePelletBonus = (level: number): number => {
+  if (level === 500) return 50;
+  if (level === 400) return 25;
+  if (level === 300) return 20;
+  if (level === 200) return 15;
+  if (level === 100) return 10;
+  return 0;
+};
+
 const DEFAULT_CANDUT: UserProfile = {
   id: CANDUT_ID,
   email: 'candut@ocean.love',
@@ -362,14 +371,16 @@ export function useAquariumStore() {
       requiredXp = getRequiredXpForNextLevel(nextLevel);
     }
 
+    let milestoneBonus = 0;
     if ([100, 200, 300, 400, 500].includes(nextLevel) && nextLevel !== aquarium.current_level) {
+      milestoneBonus = getMilestonePelletBonus(nextLevel);
       setMilestoneCelebration(nextLevel);
       playMilestoneSound();
     }
 
     const nextAqua = {
       ...aquarium,
-      pellet_balance: aquarium.pellet_balance + 1,
+      pellet_balance: aquarium.pellet_balance + 1 + milestoneBonus,
       current_level: nextLevel,
       current_xp: remainingXp,
       updated_at: new Date().toISOString(),
@@ -431,14 +442,16 @@ export function useAquariumStore() {
       requiredXp = getRequiredXpForNextLevel(nextLevel);
     }
 
+    let milestoneBonus = 0;
     if ([100, 200, 300, 400, 500].includes(nextLevel) && nextLevel !== aquarium.current_level) {
+      milestoneBonus = getMilestonePelletBonus(nextLevel);
       setMilestoneCelebration(nextLevel);
       playMilestoneSound();
     }
 
     const nextAqua = {
       ...aquarium,
-      pellet_balance: aquarium.pellet_balance + pellets,
+      pellet_balance: aquarium.pellet_balance + pellets + milestoneBonus,
       current_level: nextLevel,
       current_xp: remainingXp,
       updated_at: new Date().toISOString(),
@@ -503,14 +516,16 @@ export function useAquariumStore() {
       requiredXp = getRequiredXpForNextLevel(nextLevel);
     }
 
+    let milestoneBonus = 0;
     if ([100, 200, 300, 400, 500].includes(nextLevel) && nextLevel !== aquarium.current_level) {
+      milestoneBonus = getMilestonePelletBonus(nextLevel);
       setMilestoneCelebration(nextLevel);
       playMilestoneSound();
     }
 
     const nextAqua: AquariumData = {
       ...aquarium,
-      pellet_balance: aquarium.pellet_balance - count,
+      pellet_balance: aquarium.pellet_balance - count + milestoneBonus,
       current_level: nextLevel,
       current_xp: remainingXp,
       updated_at: new Date().toISOString(),
@@ -749,13 +764,16 @@ export function useAquariumStore() {
       requiredXp = getRequiredXpForNextLevel(nextLevel);
     }
 
+    let milestoneBonus = 0;
     if ([100, 200, 300, 400, 500].includes(nextLevel) && nextLevel !== aquarium.current_level) {
+      milestoneBonus = getMilestonePelletBonus(nextLevel);
       setMilestoneCelebration(nextLevel);
       playMilestoneSound();
     }
 
     setAquarium((prev) => ({
       ...prev,
+      pellet_balance: prev.pellet_balance + milestoneBonus,
       current_level: nextLevel,
       current_xp: remainingXp,
       updated_at: readTimestamp,
