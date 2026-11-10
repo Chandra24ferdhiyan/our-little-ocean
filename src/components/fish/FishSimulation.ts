@@ -7,6 +7,16 @@ export interface TapRipple {
   radius: number;
   maxRadius: number;
   alpha: number;
+  color?: string;
+  isResonance?: boolean;
+}
+
+export interface LuminousTrail {
+  x: number;
+  y: number;
+  radius: number;
+  alpha: number;
+  color: string;
 }
 
 export interface AmbientParticle {
@@ -47,6 +57,7 @@ export class SimFish {
   sizeBase: number;
   eyeX: number;
   eyeY: number;
+  trail: LuminousTrail[];
 
   constructor(role: 'candut' | 'repa', startX: number, startY: number) {
     this.role = role;
@@ -67,6 +78,7 @@ export class SimFish {
     this.sizeBase = 30;
     this.eyeX = 0;
     this.eyeY = 0;
+    this.trail = [];
   }
 
   update(
@@ -75,7 +87,9 @@ export class SimFish {
     partner: SimFish,
     pellets: FoodPellet[],
     targetTap: { x: number; y: number; active: boolean } | null,
-    level: number
+    level: number,
+    isPartnerOnline: boolean = false,
+    heartDancePhase: number | null = null
   ) {
     const milestoneScale = level >= 401 ? 1.20 : level >= 201 ? 1.12 : level >= 101 ? 1.05 : 0.95;
     const responsiveScale = width < 768 ? Math.max(0.58, Math.min(1.0, width / 680)) : 1.0;
@@ -113,16 +127,36 @@ export class SimFish {
       this.targetY = targetTap.y;
       this.maxSpeed = 2.4 * responsiveScale;
       this.mouthOpen = Math.max(0, this.mouthOpen - 0.1);
+    } else if (heartDancePhase !== null && heartDancePhase !== undefined) {
+      // Synchronized Heart Orbit Dance (Live Couple Feature)
+      const cx = width * 0.5;
+      const cy = height * 0.44;
+      const S = Math.min(width * 0.016, 5.8) * responsiveScale;
+      const t = heartDancePhase;
+      // Parametric Heart Cardioid Curve
+      const hx = 16 * Math.pow(Math.sin(t), 3);
+      const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+
+      if (this.role === 'candut') {
+        this.targetX = cx - hx * S;
+        this.targetY = cy + hy * S;
+      } else {
+        this.targetX = cx + hx * S;
+        this.targetY = cy + hy * S;
+      }
+      this.maxSpeed = 2.5 * responsiveScale;
+      this.mouthOpen = 0.2;
     } else {
       this.maxSpeed = 1.4 * responsiveScale;
       this.mouthOpen = Math.max(0, this.mouthOpen - 0.05);
 
       // Periodically swim gently towards partner (intimate coupling)
+      // When partner is online, swim tighter together (max 75px instead of 160px)
       const partnerDist = Math.hypot(partner.x - this.x, partner.y - this.y);
-      const maxPartnerDist = width < 640 ? 95 : 160;
-      if (partnerDist > maxPartnerDist && (this.tailPhase % 12 < 0.1)) {
-        this.targetX = partner.x + (this.role === 'candut' ? -28 : 28) * responsiveScale;
-        this.targetY = partner.y + 10 * responsiveScale;
+      const maxPartnerDist = isPartnerOnline ? 70 : (width < 640 ? 95 : 160);
+      if (partnerDist > maxPartnerDist && (this.tailPhase % 12 < 0.15)) {
+        this.targetX = partner.x + (this.role === 'candut' ? -26 : 26) * responsiveScale;
+        this.targetY = partner.y + 8 * responsiveScale;
       } else if (Math.hypot(this.targetX - this.x, this.targetY - this.y) < 35 * responsiveScale) {
         const marginX = width * 0.14;
         const marginY = height * 0.16;
@@ -161,6 +195,28 @@ export class SimFish {
     this.tailPhase += 0.15 * (this.speed / 1.1);
     this.finPhase += 0.11;
 
+    // Luminous Tail Trail Particles when swimming together or dancing
+    if (isPartnerOnline || heartDancePhase !== null) {
+      if (Math.sin(this.tailPhase * 2.5) > 0.3) {
+        const tailOffset = currentSize * 0.45;
+        this.trail.push({
+          x: this.x - Math.cos(this.angle) * tailOffset,
+          y: this.y - Math.sin(this.angle) * tailOffset,
+          radius: (this.role === 'candut' ? 2.0 : 2.3) * responsiveScale,
+          alpha: 0.65,
+          color: this.role === 'candut' ? '98, 168, 203' : '216, 115, 142',
+        });
+      }
+    }
+
+    if (this.trail.length > 0) {
+      this.trail.forEach((tr) => {
+        tr.radius += 0.12;
+        tr.alpha -= 0.024;
+      });
+      this.trail = this.trail.filter((tr) => tr.alpha > 0);
+    }
+
     const gazeAngle = Math.atan2(partner.y - this.y, partner.x - this.x);
     this.eyeX = Math.cos(gazeAngle) * 2.2 * responsiveScale;
     this.eyeY = Math.sin(gazeAngle) * 1.6 * responsiveScale;
@@ -170,6 +226,18 @@ export class SimFish {
     const isCandut = this.role === 'candut';
     const canvasW = canvasWidth || (ctx.canvas ? ctx.canvas.width / (window.devicePixelRatio || 1) : 800);
     const responsiveScale = canvasW < 768 ? Math.max(0.58, Math.min(1.0, canvasW / 680)) : 1.0;
+
+    // Render Luminous Tail Trails first (underwater water glow)
+    if (this.trail.length > 0) {
+      ctx.save();
+      this.trail.forEach((tr) => {
+        ctx.fillStyle = `rgba(${tr.color}, ${Math.max(0, tr.alpha)})`;
+        ctx.beginPath();
+        ctx.arc(tr.x, tr.y, tr.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
 
     if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
       ctx.save();

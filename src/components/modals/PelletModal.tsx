@@ -17,7 +17,11 @@ export function PelletModal({ isOpen, onClose }: PelletModalProps) {
     lastClaimDate, 
     transactions, 
     claimDailyPellet, 
-    claimSecretInteraction 
+    requestSecretClaim,
+    respondSecretClaim,
+    pendingClaims,
+    secretCooldowns,
+    currentUser,
   } = useAquarium();
 
   const [activeTab, setActiveTab] = useState<'claims' | 'history'>('claims');
@@ -27,6 +31,14 @@ export function PelletModal({ isOpen, onClose }: PelletModalProps) {
 
   const today = new Date().toISOString().split('T')[0];
   const isDailyClaimed = lastClaimDate === today;
+  const now = Date.now();
+
+  const incomingClaims = pendingClaims.filter(
+    (c) => c.status === 'pending' && c.requester_role !== currentUser.partner_role
+  );
+  const myPendingClaims = pendingClaims.filter(
+    (c) => c.status === 'pending' && c.requester_role === currentUser.partner_role
+  );
 
   const handleDailyClaim = async () => {
     const res = await claimDailyPellet();
@@ -34,10 +46,16 @@ export function PelletModal({ isOpen, onClose }: PelletModalProps) {
     setTimeout(() => setFeedback(null), 3500);
   };
 
-  const handleSecretClaim = async (type: TransactionType, pellets: number, title: string) => {
-    const res = await claimSecretInteraction(type, pellets, title);
+  const handleRequestClaim = async (type: TransactionType, pellets: number, title: string) => {
+    const res = await requestSecretClaim(type, pellets, title);
     setFeedback({ success: res.success, msg: res.message });
-    setTimeout(() => setFeedback(null), 3500);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleRespondClaim = async (requestId: string, approve: boolean) => {
+    const res = await respondSecretClaim(requestId, approve);
+    setFeedback({ success: res.success, msg: res.message });
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   return (
@@ -154,52 +172,118 @@ export function PelletModal({ isOpen, onClose }: PelletModalProps) {
                 </p>
               </div>
 
+              {/* Incoming Claim Requests from Partner (Anti-Cheat Mutual Approval) */}
+              {incomingClaims.length > 0 && (
+                <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-[#FFF0F4] to-[#F5F8FA] border-2 border-[#F3C5D1] space-y-2.5 shadow-xs">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[#F3C5D1] flex items-center justify-center p-1 shrink-0 shadow-2xs">
+                      <img src="/icons/heart_lock.png" alt="" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-[#182C3A]">
+                        Konfirmasi Klaim dari {incomingClaims[0].requester_name}
+                      </h4>
+                      <p className="text-[11px] text-[#526A7A] truncate">
+                        {incomingClaims[0].requester_name} meminta klaim: <strong className="text-[#D8738E] font-semibold">{incomingClaims[0].reward_title}</strong> (+{incomingClaims[0].pellets} Pelet)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end space-x-2 pt-1.5 border-t border-[#F3C5D1]/60">
+                    <button
+                      onClick={() => handleRespondClaim(incomingClaims[0].id, false)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold transition active:scale-95"
+                    >
+                      Belum Nih 😜
+                    </button>
+                    <button
+                      onClick={() => handleRespondClaim(incomingClaims[0].id, true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#D8738E] to-[#4A6B82] hover:opacity-90 text-white text-xs font-bold shadow-xs transition active:scale-95"
+                    >
+                      Iya, Sudah! 💕
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Secret Interactions Header */}
               <div className="pt-1">
                 <div className="flex items-center space-x-1.5 text-xs font-bold text-[#182C3A] uppercase tracking-wider">
                   <img src="/icons/heart_lock.png" alt="Privat" className="w-4 h-4 object-contain shrink-0" />
-                  <span>Interaksi Privat Pasangan</span>
+                  <span>Interaksi Privat Pasangan (Anti-Curang)</span>
                 </div>
                 <p className="text-[11px] text-[#526A7A] mt-0.5">
-                  Aktivitas personal berdua yang disepakati secara privat tanpa rincian publik.
+                  Wajib persetujuan 2 arah: klaim baru akan cair setelah pasangan mengonfirmasi bahwa interaksi nyata telah dilakukan.
                 </p>
               </div>
 
               {/* Secret Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                {SECRET_REWARDS.map((sec) => (
-                  <div
-                    key={sec.id}
-                    className="p-3 sm:p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2EAF0] flex flex-col justify-between space-y-2"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1 gap-2">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white text-[#D8738E] border border-[#F3C5D1] whitespace-nowrap shadow-2xs">
-                          {sec.badge}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-[#4A6B82] whitespace-nowrap">
-                          +{sec.pellets} Pelet
-                        </span>
-                      </div>
-                      <h4 className="font-serif text-sm text-[#182C3A] font-bold leading-tight">
-                        {sec.title}
-                      </h4>
-                    </div>
+                {SECRET_REWARDS.map((sec) => {
+                  const lastClaim = secretCooldowns[sec.id] || 0;
+                  const cooldownMs = 4 * 3600 * 1000;
+                  const isCooldown = now - lastClaim < cooldownMs;
+                  const waitHours = Math.ceil((cooldownMs - (now - lastClaim)) / 3600000);
+                  const myPending = myPendingClaims.find((c) => c.reward_id === sec.id);
+                  const partnerPending = incomingClaims.find((c) => c.reward_id === sec.id);
 
-                    <div className="pt-2 border-t border-[#E2EAF0] flex items-center justify-between">
-                      <span className="text-[10px] sm:text-[11px] text-[#526A7A] flex items-center space-x-1">
-                        <img src="/icons/heart_lock.png" alt="Privat" className="w-3.5 h-3.5 object-contain shrink-0" />
-                        <span>Privat</span>
-                      </span>
-                      <button
-                        onClick={() => handleSecretClaim(sec.id, sec.pellets, sec.title)}
-                        className="px-3 py-1 rounded-lg bg-white hover:bg-[#F4F7F9] text-[#182C3A] border border-[#CBD7DF] text-xs font-semibold transition shadow-2xs active:scale-95 whitespace-nowrap"
-                      >
-                        Buka Hadiah
-                      </button>
+                  return (
+                    <div
+                      key={sec.id}
+                      className="p-3 sm:p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2EAF0] flex flex-col justify-between space-y-2"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white text-[#D8738E] border border-[#F3C5D1] whitespace-nowrap shadow-2xs">
+                            {sec.badge}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-[#4A6B82] whitespace-nowrap">
+                            +{sec.pellets} Pelet
+                          </span>
+                        </div>
+                        <h4 className="font-serif text-sm text-[#182C3A] font-bold leading-tight">
+                          {sec.title}
+                        </h4>
+                        <p className="text-[11px] text-[#526A7A] mt-1 leading-snug">
+                          {sec.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-[#E2EAF0] flex items-center justify-between gap-1.5">
+                        <span className="text-[10px] sm:text-[11px] text-[#526A7A] flex items-center space-x-1 shrink-0">
+                          <img src="/icons/heart_lock.png" alt="Privat" className="w-3.5 h-3.5 object-contain shrink-0" />
+                          <span>Persetujuan 2 Arah</span>
+                        </span>
+
+                        {isCooldown ? (
+                          <button
+                            disabled
+                            className="px-2.5 py-1 rounded-lg bg-[#E2EAF0] text-[#526A7A] text-[11px] font-medium cursor-not-allowed whitespace-nowrap"
+                          >
+                            Istirahat ({waitHours}j)
+                          </button>
+                        ) : myPending ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold whitespace-nowrap">
+                            Menunggu Konfirmasi... ⏳
+                          </span>
+                        ) : partnerPending ? (
+                          <button
+                            onClick={() => handleRespondClaim(partnerPending.id, true)}
+                            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#D8738E] to-[#4A6B82] text-white text-[11px] font-bold shadow-2xs active:scale-95 whitespace-nowrap"
+                          >
+                            Konfirmasi 💕
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRequestClaim(sec.id, sec.pellets, sec.title)}
+                            className="px-3 py-1 rounded-lg bg-white hover:bg-[#F4F7F9] text-[#182C3A] border border-[#CBD7DF] text-xs font-semibold transition shadow-2xs active:scale-95 whitespace-nowrap"
+                          >
+                            Ajukan Klaim 💕
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

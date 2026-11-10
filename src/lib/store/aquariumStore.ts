@@ -10,11 +10,12 @@ import {
   UserProfile,
   TransactionType,
   MessageCategory,
-  DayTimeMode
+  DayTimeMode,
+  SecretClaimRequest
 } from '@/types/aquarium';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
-import { getRequiredXpForNextLevel } from '@/lib/level-system/levelConfig';
-import { playFeedSound, playBubblePopSound, playMilestoneSound, playCapsuleUnlockSound } from '@/lib/audio/soundEffects';
+import { getRequiredXpForNextLevel, SECRET_REWARDS } from '@/lib/level-system/levelConfig';
+import { playFeedSound, playBubblePopSound, playMilestoneSound, playCapsuleUnlockSound, playDualTapResonanceSound } from '@/lib/audio/soundEffects';
 
 const STORAGE_KEY = 'candut_repa_ocean_state_v4';
 const ROLE_STORAGE_KEY = 'candut_repa_active_role';
@@ -168,7 +169,11 @@ export function useAquariumStore() {
   const [milestoneCelebration, setMilestoneCelebration] = useState<number | null>(null);
   const [dayTimeMode, setDayTimeModeState] = useState<DayTimeMode>('auto');
   const [secretCooldowns, setSecretCooldowns] = useState<Record<string, number>>({});
+  const [isPartnerOnline, setIsPartnerOnline] = useState<boolean>(false);
+  const [remoteTap, setRemoteTap] = useState<{ x: number; y: number; role: FishRole; time: number } | null>(null);
+  const [pendingClaims, setPendingClaims] = useState<SecretClaimRequest[]>([]);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const realtimeChannelRef = useRef<any>(null);
 
   // 1. Initialize Role & Clean Legacy State on Client Mount
   useEffect(() => {
@@ -260,9 +265,15 @@ export function useAquariumStore() {
 
     fetchInitialData();
 
-    // Supabase Realtime WebSocket listener
+    // Supabase Realtime WebSocket listener & Presence tracking
     const channel = client
-      .channel('aquarium_couple_sync')
+      .channel('aquarium_couple_sync', {
+        config: {
+          presence: {
+            key: currentUser.partner_role,
+          },
+        },
+      })
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'aquariums' },
@@ -298,12 +309,60 @@ export function useAquariumStore() {
           }
         }
       )
-      .subscribe();
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const partnerRole = currentUser.partner_role === 'candut' ? 'repa' : 'candut';
+        const partnerPresences = state[partnerRole] as any[];
+        setIsPartnerOnline(Boolean(partnerPresences && partnerPresences.length > 0));
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        const partnerRole = currentUser.partner_role === 'candut' ? 'repa' : 'candut';
+        if (key === partnerRole) {
+          setIsPartnerOnline(true);
+        }
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        const partnerRole = currentUser.partner_role === 'candut' ? 'repa' : 'candut';
+        if (key === partnerRole) {
+          const state = channel.presenceState();
+          const partnerPresences = state[partnerRole] as any[];
+          setIsPartnerOnline(Boolean(partnerPresences && partnerPresences.length > 0));
+        }
+      })
+      .on('broadcast', { event: 'tap_glass' }, (payload) => {
+        if (payload?.payload && payload.payload.role !== currentUser.partner_role) {
+          setRemoteTap({
+            x: payload.payload.x,
+            y: payload.payload.y,
+            role: payload.payload.role,
+            time: Date.now(),
+          });
+        }
+      })
+      .on('broadcast', { event: 'secret_claim_update' }, (payload) => {
+        if (payload?.payload) {
+          const claim = payload.payload as SecretClaimRequest;
+          if (claim.status === 'approved') {
+            fetchInitialData();
+          }
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            role: currentUser.partner_role,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    realtimeChannelRef.current = channel;
 
     return () => {
+      realtimeChannelRef.current = null;
       client.removeChannel(channel);
     };
-  }, []);
+  }, [currentUser.partner_role]);
 
   // 3. Bulletproof Background Cloud Re-Sync (Every 2.5s + Instant on Window Focus)
   // Ensures two mobile phones are 100% synchronized even if WebSockets sleep on mobile
@@ -364,6 +423,22 @@ export function useAquariumStore() {
       window.removeEventListener('visibilitychange', onFocusOrVisibility);
     };
   }, []);
+
+  // 3b. Extract pending secret claim requests from bubble messages
+  useEffect(() => {
+    const claims: SecretClaimRequest[] = [];
+    messages.forEach((m) => {
+      if (m.status === 'pending' && m.message && m.message.startsWith('__SECRET_CLAIM_REQ__:')) {
+        try {
+          const raw = m.message.replace('__SECRET_CLAIM_REQ__:', '');
+          const parsed = JSON.parse(raw) as SecretClaimRequest;
+          parsed.bubble_id = m.id;
+          claims.push(parsed);
+        } catch (_) {}
+      }
+    });
+    setPendingClaims(claims);
+  }, [messages]);
 
   // 4. Save to localStorage for instant local loading (Persist only within 7-day retention)
   useEffect(() => {
@@ -455,80 +530,6 @@ export function useAquariumStore() {
 
     return { success: true, message: 'Berhasil mengklaim 1 pelet dan 50 XP harian.' };
   }, [lastClaimDate, aquarium]);
-
-  // Claim Secret Interaction Pellets (+2, +3, +4, +5 Pellets)
-  const claimSecretInteraction = useCallback(async (
-    type: TransactionType, 
-    pellets: number, 
-    title: string
-  ): Promise<{ success: boolean; message: string }> => {
-    const now = Date.now();
-    const lastClaim = secretCooldowns[type] || 0;
-    const cooldownMs = 4 * 3600 * 1000;
-
-    if (now - lastClaim < cooldownMs) {
-      const waitHours = Math.ceil((cooldownMs - (now - lastClaim)) / 3600000);
-      return { 
-        success: false, 
-        message: `Interaksi rahasia sedang istirahat. Dapat dibuka kembali dalam ${waitHours} jam.` 
-      };
-    }
-
-    const xpReward = pellets * 20;
-    const nextXp = aquarium.current_xp + xpReward;
-    let nextLevel = aquarium.current_level;
-    let remainingXp = nextXp;
-    let requiredXp = getRequiredXpForNextLevel(nextLevel);
-
-    while (remainingXp >= requiredXp && nextLevel < 500) {
-      remainingXp -= requiredXp;
-      nextLevel += 1;
-      requiredXp = getRequiredXpForNextLevel(nextLevel);
-    }
-
-    let milestoneBonus = 0;
-    if ([100, 200, 300, 400, 500].includes(nextLevel) && nextLevel !== aquarium.current_level) {
-      milestoneBonus = getMilestonePelletBonus(nextLevel);
-      setMilestoneCelebration(nextLevel);
-      playMilestoneSound();
-    }
-
-    const nextAqua = {
-      ...aquarium,
-      pellet_balance: aquarium.pellet_balance + pellets + milestoneBonus,
-      current_level: nextLevel,
-      current_xp: remainingXp,
-      updated_at: new Date().toISOString(),
-    };
-
-    setAquarium(nextAqua);
-    setSecretCooldowns((prev) => ({ ...prev, [type]: now }));
-
-    // Sync to Supabase cloud
-    if (isSupabaseConfigured && supabase) {
-      const client = supabase;
-      (async () => {
-        try {
-          await client
-            .from('aquariums')
-            .update({
-              pellet_balance: nextAqua.pellet_balance,
-              current_level: nextAqua.current_level,
-              current_xp: nextAqua.current_xp,
-              updated_at: nextAqua.updated_at,
-            })
-            .eq('id', AQUARIUM_ID);
-        } catch (err) {
-          console.error('Supabase secret claim error:', err);
-        }
-      })();
-    }
-
-    return { 
-      success: true, 
-      message: `Interaksi tersimpan: +${pellets} pelet dan +${xpReward} XP diperoleh.` 
-    };
-  }, [secretCooldowns, aquarium]);
 
   // Feed Fish (Atomically deducts balance, adds XP, drops visual pellets, and syncs directly to Supabase)
   const feedFish = useCallback((count: number = 1): { success: boolean; message: string } => {
@@ -890,6 +891,217 @@ export function useAquariumStore() {
     };
   }, [messages, currentUser, aquarium]);
 
+  // Broadcast local glass tap to partner's screen
+  const sendTapBroadcast = useCallback((xPercent: number, yPercent: number) => {
+    if (realtimeChannelRef.current) {
+      realtimeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'tap_glass',
+        payload: {
+          x: xPercent,
+          y: yPercent,
+          role: currentUser.partner_role,
+          time: Date.now(),
+        },
+      });
+    }
+  }, [currentUser.partner_role]);
+
+  // Request Secret Interaction Claim (Two-Way Mutual Approval Anti-Cheat)
+  const requestSecretClaim = useCallback(async (
+    type: TransactionType,
+    pellets: number,
+    title: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const now = Date.now();
+    const lastClaim = secretCooldowns[type] || 0;
+    const cooldownMs = 4 * 3600 * 1000;
+
+    if (now - lastClaim < cooldownMs) {
+      const waitHours = Math.ceil((cooldownMs - (now - lastClaim)) / 3600000);
+      return {
+        success: false,
+        message: `Interaksi rahasia sedang istirahat. Dapat diajukan kembali dalam ${waitHours} jam.`
+      };
+    }
+
+    // Check if there is already a pending claim for this interaction
+    const isAlreadyPending = pendingClaims.some(
+      (c) => c.reward_id === type && c.status === 'pending'
+    );
+    if (isAlreadyPending) {
+      return {
+        success: false,
+        message: 'Klaim untuk interaksi ini sudah diajukan dan sedang menunggu konfirmasi pasangan.'
+      };
+    }
+
+    const claimReq: SecretClaimRequest = {
+      id: `claim-${Date.now()}`,
+      reward_id: type,
+      reward_title: title,
+      pellets,
+      requester_role: currentUser.partner_role,
+      requester_name: currentUser.display_name,
+      created_at: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    const partnerName = currentUser.partner_role === 'candut' ? 'Saridut' : 'Candut';
+    const rawPayload = `__SECRET_CLAIM_REQ__:${JSON.stringify(claimReq)}`;
+
+    // Release as floating heart-lock bubble in aquarium
+    createBubbleMessage(rawPayload, 'bubble-rose', 'love');
+
+    // Broadcast realtime event
+    if (realtimeChannelRef.current) {
+      realtimeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'secret_claim_update',
+        payload: claimReq,
+      });
+    }
+
+    return {
+      success: true,
+      message: `Permintaan klaim "${title}" berhasil dikirim ke ${partnerName}. Hadiah akan masuk setelah dikonfirmasi! 💕`
+    };
+  }, [secretCooldowns, pendingClaims, currentUser, createBubbleMessage]);
+
+  // Respond to Secret Interaction Claim (Partner approves or rejects)
+  const respondSecretClaim = useCallback(async (
+    requestId: string,
+    approve: boolean
+  ): Promise<{ success: boolean; message: string }> => {
+    const claim = pendingClaims.find((c) => c.id === requestId);
+    if (!claim) {
+      return { success: false, message: 'Permintaan klaim tidak ditemukan atau sudah selesai diproses.' };
+    }
+
+    const bubble = messages.find(
+      (m) => m.id === claim.bubble_id || (m.message && m.message.includes(requestId))
+    );
+
+    const now = Date.now();
+    const readTimestamp = new Date().toISOString();
+
+    if (approve) {
+      const pellets = claim.pellets;
+      const xpReward = pellets * 20;
+      const nextXp = aquarium.current_xp + xpReward;
+      let nextLevel = aquarium.current_level;
+      let remainingXp = nextXp;
+      let requiredXp = getRequiredXpForNextLevel(nextLevel);
+
+      while (remainingXp >= requiredXp && nextLevel < 500) {
+        remainingXp -= requiredXp;
+        nextLevel += 1;
+        requiredXp = getRequiredXpForNextLevel(nextLevel);
+      }
+
+      let milestoneBonus = 0;
+      if ([100, 200, 300, 400, 500].includes(nextLevel) && nextLevel !== aquarium.current_level) {
+        milestoneBonus = getMilestonePelletBonus(nextLevel);
+        setMilestoneCelebration(nextLevel);
+        playMilestoneSound();
+      }
+
+      const nextAqua = {
+        ...aquarium,
+        pellet_balance: aquarium.pellet_balance + pellets + milestoneBonus,
+        current_level: nextLevel,
+        current_xp: remainingXp,
+        updated_at: readTimestamp,
+      };
+
+      setAquarium(nextAqua);
+      setSecretCooldowns((prev) => ({ ...prev, [claim.reward_id]: now }));
+
+      // Update bubble message to 'read'
+      if (bubble) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === bubble.id ? { ...m, status: 'read', read_at: readTimestamp } : m))
+        );
+      }
+
+      // Sync to Supabase
+      if (isSupabaseConfigured && supabase) {
+        const client = supabase;
+        (async () => {
+          try {
+            await client.from('aquariums').update({
+              pellet_balance: nextAqua.pellet_balance,
+              current_level: nextAqua.current_level,
+              current_xp: nextAqua.current_xp,
+              updated_at: readTimestamp,
+            }).eq('id', AQUARIUM_ID);
+
+            if (bubble) {
+              await client.from('bubble_messages').update({
+                status: 'read',
+                read_at: readTimestamp,
+              }).eq('id', bubble.id);
+            }
+          } catch (err) {
+            console.error('Approval sync error:', err);
+          }
+        })();
+      }
+
+      // Broadcast approval to partner
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'secret_claim_update',
+          payload: { ...claim, status: 'approved' },
+        });
+      }
+
+      playCapsuleUnlockSound();
+
+      return {
+        success: true,
+        message: `Klaim "${claim.reward_title}" berhasil dikonfirmasi! +${pellets} Pelet dan +${xpReward} XP telah masuk ke akuarium kalian! 💕`
+      };
+    } else {
+      // Rejected: mark bubble as read
+      if (bubble) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === bubble.id ? { ...m, status: 'read', read_at: readTimestamp } : m))
+        );
+      }
+
+      if (isSupabaseConfigured && supabase && bubble) {
+        supabase.from('bubble_messages').update({
+          status: 'read',
+          read_at: readTimestamp,
+        }).eq('id', bubble.id).then(() => {});
+      }
+
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'secret_claim_update',
+          payload: { ...claim, status: 'rejected' },
+        });
+      }
+
+      return {
+        success: true,
+        message: `Permintaan klaim "${claim.reward_title}" telah ditolak.`
+      };
+    }
+  }, [pendingClaims, messages, aquarium]);
+
+  // Backward compatibility: delegate to requestSecretClaim
+  const claimSecretInteraction = useCallback(async (
+    type: TransactionType,
+    pellets: number,
+    title: string
+  ): Promise<{ success: boolean; message: string }> => {
+    return requestSecretClaim(type, pellets, title);
+  }, [requestSecretClaim]);
+
   const pairWithInviteCode = useCallback((code: string): { success: boolean; message: string } => {
     return { success: true, message: 'Akuarium Candut & Saridut sudah otomatis terhubung secara permanen.' };
   }, []);
@@ -917,11 +1129,18 @@ export function useAquariumStore() {
     lastClaimDate,
     milestoneCelebration,
     dayTimeMode,
+    isPartnerOnline,
+    remoteTap,
+    pendingClaims,
+    secretCooldowns,
     setDayTimeMode,
     setMilestoneCelebration,
     switchPartner,
     claimDailyPellet,
     claimSecretInteraction,
+    requestSecretClaim,
+    respondSecretClaim,
+    sendTapBroadcast,
     feedFish,
     consumePellet,
     changeTheme,

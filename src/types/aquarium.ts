@@ -129,3 +129,15 @@ export interface SecretReward {
   badge: string;
   description: string;
 }
+
+export interface SecretClaimRequest {
+  id: string;
+  reward_id: TransactionType;
+  reward_title: string;
+  pellets: number;
+  requester_role: FishRole;
+  requester_name: string;
+  created_at: string;
+  status: 'pending' | 'approved' | 'rejected';
+  bubble_id?: string;
+}

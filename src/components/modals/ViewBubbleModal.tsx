@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { BubbleMessage } from '@/types/aquarium';
+import { useAquarium } from '@/lib/store/AquariumContext';
 import { playWhisperVoiceSound } from '@/lib/audio/soundEffects';
 import { 
   X, 
@@ -24,8 +25,10 @@ interface ViewBubbleModalProps {
 }
 
 export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalProps) {
+  const { respondSecretClaim, currentUser } = useAquarium();
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
+  const [isResponding, setIsResponding] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -38,6 +41,22 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
   }, [message]);
 
   if (!message) return null;
+
+  const isSecretClaim = message.message && message.message.startsWith('__SECRET_CLAIM_REQ__:');
+  let claimReq: any = null;
+  if (isSecretClaim) {
+    try {
+      claimReq = JSON.parse(message.message.replace('__SECRET_CLAIM_REQ__:', ''));
+    } catch (_) {}
+  }
+
+  const handleSecretResponse = async (approve: boolean) => {
+    if (!claimReq || isResponding) return;
+    setIsResponding(true);
+    await respondSecretClaim(claimReq.id, approve);
+    setIsResponding(false);
+    onClose();
+  };
 
   const isFromCandut = message.sender_role === 'candut';
   const senderName = isFromCandut
@@ -89,7 +108,7 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
     }
   };
 
-  const xpReward = message.is_capsule ? 50 : 25;
+  const xpReward = message.is_capsule ? 50 : isSecretClaim ? (claimReq ? claimReq.pellets * 20 : 40) : 25;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[#182C3A]/50 backdrop-blur-sm animate-fadeIn">
@@ -115,7 +134,9 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
                 : 'bg-[#FCE8EE] border-[#F3C5D1] text-[#D8738E]'
             }`}
           >
-            {message.is_capsule ? (
+            {isSecretClaim ? (
+              <img src="/icons/heart_lock.png" alt="Privat" className="w-7 h-7 object-contain" />
+            ) : message.is_capsule ? (
               <img src="/icons/time_capsule.png" alt="Kapsul" className="w-7 h-7 object-contain" />
             ) : message.audio_url ? (
               <img src="/icons/whisper_voice.png" alt="Suara" className="w-7 h-7 object-contain" />
@@ -129,7 +150,9 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
                 {senderName}
               </h3>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${
-                message.is_capsule
+                isSecretClaim
+                  ? 'bg-[#FCE8EE] text-[#D8738E] border-[#F3C5D1]'
+                  : message.is_capsule
                   ? 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]'
                   : message.audio_url
                   ? 'bg-[#FCE8EE] text-[#D8738E] border-[#F3C5D1]'
@@ -137,7 +160,7 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
                   ? 'bg-[#EBF2F7] text-[#4A6B82] border-[#CBD7DF]'
                   : 'bg-[#FCE8EE] text-[#D8738E] border-[#F3C5D1]'
               }`}>
-                {message.is_capsule ? 'Kapsul Waktu' : message.audio_url ? 'Bisikan Suara' : 'Pesan Personal'}
+                {isSecretClaim ? 'Klaim Interaksi Rahasia' : message.is_capsule ? 'Kapsul Waktu' : message.audio_url ? 'Bisikan Suara' : 'Pesan Personal'}
               </span>
             </div>
             <div className="flex items-center space-x-2 text-xs text-[#526A7A] mt-0.5">
@@ -214,8 +237,34 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
           </div>
         )}
 
-        {/* Letter Body Card */}
-        {message.message && message.message !== '🎙️ Bisikan Suara Bawah Air' && (
+        {/* Secret Claim Approval Card */}
+        {isSecretClaim && claimReq && (
+          <div className="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-[#FFF0F4] to-[#F5F8FA] border-2 border-[#F3C5D1] mb-5 space-y-3">
+            <div className="flex items-center space-x-2 text-xs font-bold text-[#D8738E]">
+              <img src="/icons/heart_lock.png" alt="" className="w-4 h-4 object-contain" />
+              <span>Persetujuan 2 Arah (Anti-Curang)</span>
+            </div>
+            <h4 className="font-serif text-base font-bold text-[#182C3A]">
+              {claimReq.reward_title}
+            </h4>
+            {currentUser.partner_role !== claimReq.requester_role ? (
+              <p className="text-xs text-[#526A7A] leading-relaxed">
+                <strong>{claimReq.requester_name}</strong> menyatakan telah melakukan interaksi privat ini bersama kamu di dunia nyata. Apakah ini benar?
+              </p>
+            ) : (
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Klaim telah kamu ajukan. Menunggu pasanganmu mengonfirmasi agar hadiah pelet dan XP otomatis dicairkan.
+              </p>
+            )}
+            <div className="p-2.5 bg-white/90 rounded-xl border border-[#F3C5D1]/60 flex items-center justify-between text-xs font-mono font-bold text-[#4A6B82]">
+              <span>Hadiah Hubungan:</span>
+              <span>+{claimReq.pellets} Pelet &bull; +{claimReq.pellets * 20} XP</span>
+            </div>
+          </div>
+        )}
+
+        {/* Standard Letter Body Card (When not a secret claim request) */}
+        {!isSecretClaim && message.message && message.message !== '🎙️ Bisikan Suara Bawah Air' && (
           <div className={`p-4 md:p-5 rounded-xl border mb-5 ${
             isFromCandut
               ? 'bg-[#F8FAFC] border-[#CBD7DF]'
@@ -235,28 +284,61 @@ export function ViewBubbleModal({ message, onClose, onReply }: ViewBubbleModalPr
           </div>
 
           <div className="flex items-center space-x-2 shrink-0">
-            {onReply && (
-              <button
-                onClick={() => {
-                  if (audioRef.current) audioRef.current.pause();
-                  onClose();
-                  onReply(message);
-                }}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-[#4A6B82] to-[#D8738E] hover:opacity-95 text-white font-semibold rounded-lg shadow-sm flex items-center space-x-1.5 transition active:scale-95 text-xs"
-              >
-                <CornerUpLeft className="w-3.5 h-3.5" />
-                <span>Balas Pesan</span>
-              </button>
+            {isSecretClaim && claimReq ? (
+              currentUser.partner_role !== claimReq.requester_role ? (
+                <>
+                  <button
+                    disabled={isResponding}
+                    onClick={() => handleSecretResponse(false)}
+                    className="px-3 py-1.5 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 font-semibold rounded-lg text-xs transition active:scale-95 disabled:opacity-50"
+                  >
+                    Belum Nih 😜
+                  </button>
+                  <button
+                    disabled={isResponding}
+                    onClick={() => handleSecretResponse(true)}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-[#D8738E] to-[#4A6B82] hover:opacity-95 text-white font-bold rounded-lg shadow-sm text-xs transition active:scale-95 disabled:opacity-50"
+                  >
+                    Iya, Sudah! 💕
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (audioRef.current) audioRef.current.pause();
+                    onClose();
+                  }}
+                  className="px-3.5 py-1.5 bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] font-semibold rounded-lg border border-[#CBD7DF] transition shadow-2xs text-xs"
+                >
+                  Tutup
+                </button>
+              )
+            ) : (
+              <>
+                {onReply && (
+                  <button
+                    onClick={() => {
+                      if (audioRef.current) audioRef.current.pause();
+                      onClose();
+                      onReply(message);
+                    }}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-[#4A6B82] to-[#D8738E] hover:opacity-95 text-white font-semibold rounded-lg shadow-sm flex items-center space-x-1.5 transition active:scale-95 text-xs"
+                  >
+                    <CornerUpLeft className="w-3.5 h-3.5" />
+                    <span>Balas Pesan</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (audioRef.current) audioRef.current.pause();
+                    onClose();
+                  }}
+                  className="px-3.5 py-1.5 bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] font-semibold rounded-lg border border-[#CBD7DF] transition shadow-2xs text-xs"
+                >
+                  Tutup
+                </button>
+              </>
             )}
-            <button
-              onClick={() => {
-                if (audioRef.current) audioRef.current.pause();
-                onClose();
-              }}
-              className="px-3.5 py-1.5 bg-[#F8FAFC] hover:bg-[#F1F5F8] text-[#182C3A] font-semibold rounded-lg border border-[#CBD7DF] transition shadow-2xs text-xs"
-            >
-              Tutup
-            </button>
           </div>
         </div>
       </div>

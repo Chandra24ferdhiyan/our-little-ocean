@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useAquarium } from '@/lib/store/AquariumContext';
 import { AQUARIUM_THEMES } from '@/lib/themes/themeConfig';
-import { playTapGlassSound } from '@/lib/audio/soundEffects';
+import { playTapGlassSound, playDualTapResonanceSound } from '@/lib/audio/soundEffects';
 import { DayTimeMode } from '@/types/aquarium';
 import {
   SimFish,
@@ -46,7 +46,17 @@ interface AquariumCanvasProps {
 export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { aquarium, droppedPellets, consumePellet, dayTimeMode, setDayTimeMode } = useAquarium();
+  const { 
+    aquarium, 
+    droppedPellets, 
+    consumePellet, 
+    dayTimeMode, 
+    setDayTimeMode,
+    isPartnerOnline,
+    remoteTap,
+    sendTapBroadcast,
+    currentUser,
+  } = useAquarium();
   const [isDayMenuOpen, setIsDayMenuOpen] = useState(false);
 
   const simState = useRef<{
@@ -57,6 +67,9 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     nightPlankton: { x: number; y: number; r: number; alpha: number; speedY: number; speedX: number; color: string }[];
     pellets: FoodPellet[];
     lastTap: { x: number; y: number; active: boolean; timer: number } | null;
+    lastLocalTap: { x: number; y: number; time: number } | null;
+    lastResonanceTime: number;
+    lastHeartApex: number;
     causticOffset: number;
     plantPhase: number;
     kissHearts: { x: number; y: number; alpha: number; scale: number; vy: number }[];
@@ -69,6 +82,9 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     nightPlankton: [],
     pellets: [],
     lastTap: null,
+    lastLocalTap: null,
+    lastResonanceTime: 0,
+    lastHeartApex: 0,
     causticOffset: 0,
     plantPhase: 0,
     kissHearts: [],
@@ -126,6 +142,56 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     });
   }, [droppedPellets]);
 
+  const triggerResonance = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    const now = Date.now();
+    if (now - simState.current.lastResonanceTime < 2000) return;
+    simState.current.lastResonanceTime = now;
+
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+
+    // Golden & Soft Rose Harmonic Resonance Shockwaves
+    simState.current.ripples.push({
+      x: mx,
+      y: my,
+      radius: 6,
+      maxRadius: 100,
+      alpha: 1.0,
+      isResonance: true,
+      color: '#FCD34D',
+    });
+    simState.current.ripples.push({
+      x: mx,
+      y: my,
+      radius: 3,
+      maxRadius: 125,
+      alpha: 0.9,
+      isResonance: true,
+      color: '#F472B6',
+    });
+
+    // 12 Floating Love Hearts Bursting from Resonance
+    for (let i = 0; i < 12; i++) {
+      simState.current.kissHearts.push({
+        x: mx + (Math.random() - 0.5) * 48,
+        y: my + (Math.random() - 0.5) * 36,
+        alpha: 1.0,
+        scale: 0.8 + Math.random() * 0.5,
+        vy: -(1.1 + Math.random() * 0.9),
+      });
+    }
+
+    // Play ethereal sub-bass + twin glass harp harmonic chords
+    playDualTapResonanceSound();
+
+    // Subtle mobile haptic vibration
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([40, 60, 40]);
+      } catch (_) {}
+    }
+  }, []);
+
   const handleTap = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
@@ -146,8 +212,13 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
 
       const x = clientX - rect.left;
       const y = clientY - rect.top;
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
 
       playTapGlassSound();
+
+      const myRoleColor = currentUser.partner_role === 'candut' ? '#62A8CB' : '#D8738E';
 
       simState.current.ripples.push({
         x,
@@ -155,6 +226,7 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
         radius: 4,
         maxRadius: 48,
         alpha: 0.75,
+        color: myRoleColor,
       });
 
       // Spawn 3 subtle rising micro-bubbles at tap point
@@ -176,12 +248,57 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
         timer: Date.now() + 2200,
       };
 
+      const now = Date.now();
+      simState.current.lastLocalTap = { x, y, time: now };
+
+      // Broadcast tap to partner
+      if (sendTapBroadcast && width > 0 && height > 0) {
+        sendTapBroadcast(x / width, y / height);
+      }
+
+      // Check if partner tapped recently (within 2.5s) -> Dual-Tap Resonance!
+      if (remoteTap && Math.abs(now - remoteTap.time) < 2500) {
+        triggerResonance(x, y, remoteTap.x * width, remoteTap.y * height);
+      }
+
       if (onTapLocation) {
         onTapLocation(x, y);
       }
     },
-    [onTapLocation]
+    [onTapLocation, currentUser.partner_role, sendTapBroadcast, remoteTap, triggerResonance]
   );
+
+  // Realtime Partner Remote Tap Listener & Resonance Detector
+  useEffect(() => {
+    if (!remoteTap) return;
+    const now = Date.now();
+    if (now - remoteTap.time > 3000) return; // Stale tap
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+
+    const rx = remoteTap.x * width;
+    const ry = remoteTap.y * height;
+    const partnerColor = remoteTap.role === 'candut' ? '#62A8CB' : '#D8738E';
+
+    simState.current.ripples.push({
+      x: rx,
+      y: ry,
+      radius: 4,
+      maxRadius: 52,
+      alpha: 0.85,
+      color: partnerColor,
+    });
+
+    // Check if local tap was within 2.5s -> Dual-Tap Resonance!
+    const lastLocal = simState.current.lastLocalTap;
+    if (lastLocal && Math.abs(now - lastLocal.time) < 2500) {
+      triggerResonance(lastLocal.x, lastLocal.y, rx, ry);
+    }
+  }, [remoteTap, triggerResonance]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -556,13 +673,22 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
 
       // --- 8. Glass Tap Shockwave Ring ---
       simState.current.ripples.forEach((r) => {
-        r.radius += 1.8;
-        r.alpha -= 0.032;
+        r.radius += r.isResonance ? 2.6 : 1.8;
+        r.alpha -= r.isResonance ? 0.018 : 0.032;
 
         if (r.alpha > 0) {
           ctx.save();
-          ctx.strokeStyle = `rgba(243, 240, 232, ${Math.max(0, r.alpha)})`;
-          ctx.lineWidth = 1.2;
+          if (r.isResonance) {
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = r.color || '#FCD34D';
+            ctx.strokeStyle = r.color || '#FCD34D';
+            ctx.lineWidth = 2.6;
+          } else {
+            ctx.strokeStyle = r.color
+              ? `${r.color}${Math.floor(Math.max(0, r.alpha) * 255).toString(16).padStart(2, '0')}`
+              : `rgba(243, 240, 232, ${Math.max(0, r.alpha)})`;
+            ctx.lineWidth = 1.4;
+          }
           ctx.beginPath();
           ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
           ctx.stroke();
@@ -583,13 +709,30 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       const candutSprite = fishSpritesRef.current[`candut_${stage}`];
       const repaSprite = fishSpritesRef.current[`repa_${stage}`];
 
-      candut.update(width, height, repa, simState.current.pellets, simState.current.lastTap, level);
-      repa.update(width, height, candut, simState.current.pellets, simState.current.lastTap, level);
+      // Live Couple Presence: Heart Orbit Dance Cycle (7s dance every 22s)
+      const now = Date.now();
+      const cyclePos = now % 22000;
+      const isDancing = isPartnerOnline && cyclePos < 7000;
+      const heartDancePhase = isDancing ? (cyclePos / 7000) * Math.PI * 2 : null;
+
+      // Spawn apex glowing heart particle during heart dance when both fish kiss at the peak
+      if (isDancing && cyclePos > 3200 && cyclePos < 3800 && now - simState.current.lastHeartApex > 5000) {
+        simState.current.lastHeartApex = now;
+        simState.current.kissHearts.push({
+          x: width * 0.5,
+          y: height * 0.38,
+          alpha: 1.0,
+          scale: 1.1,
+          vy: -0.7,
+        });
+      }
+
+      candut.update(width, height, repa, simState.current.pellets, simState.current.lastTap, level, isPartnerOnline, heartDancePhase);
+      repa.update(width, height, candut, simState.current.pellets, simState.current.lastTap, level, isPartnerOnline, heartDancePhase);
 
       // Level 201+ Gesture Sapaan Ciuman Hidung saat Berpapasan
-      if (level >= 201) {
+      if (level >= 201 && !isDancing) {
         const fishDist = Math.hypot(candut.x - repa.x, candut.y - repa.y);
-        const now = Date.now();
         if (fishDist < 46 && now - simState.current.lastKiss > 6000) {
           simState.current.lastKiss = now;
           simState.current.kissHearts.push({
@@ -655,7 +798,7 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, [aquarium.active_theme, aquarium.current_level, consumePellet, dayTimeMode]);
+  }, [aquarium.active_theme, aquarium.current_level, consumePellet, dayTimeMode, isPartnerOnline]);
 
   const activePhase = getCurrentDayPhase(dayTimeMode);
 

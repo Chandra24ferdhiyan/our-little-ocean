@@ -330,3 +330,51 @@ export function playWhisperVoiceSound() {
   osc.stop(now + 0.26);
 }
 
+/**
+ * Dual-Tap Glass Resonance Sound:
+ * Intimate celestial glass harp chord played when both partners tap the aquarium together.
+ */
+export function playDualTapResonanceSound() {
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.45 * globalVolume, now);
+  master.connect(ctx.destination);
+
+  // Warm deep water harmonic bass
+  const subOsc = ctx.createOscillator();
+  const subGain = ctx.createGain();
+  subOsc.type = 'sine';
+  subOsc.frequency.setValueAtTime(261.63, now); // C4
+  subGain.gain.setValueAtTime(0.5, now);
+  subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+  subOsc.connect(subGain);
+  subGain.connect(master);
+  subOsc.start(now);
+  subOsc.stop(now + 0.95);
+
+  // Twin harmonic chimes (F#5, A5, C#6, E6)
+  const notes = [739.99, 880.00, 1108.73, 1318.51];
+  notes.forEach((freq, idx) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const noteTime = now + idx * 0.06;
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, noteTime);
+
+    gain.gain.setValueAtTime(0.01, noteTime);
+    gain.gain.linearRampToValueAtTime(0.4, noteTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.7);
+
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(noteTime);
+    osc.stop(noteTime + 0.75);
+  });
+}
+
+

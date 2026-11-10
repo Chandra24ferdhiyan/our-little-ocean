@@ -40,7 +40,22 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
   const handleBubbleClick = (e: React.MouseEvent, msg: BubbleMessage) => {
     e.stopPropagation();
 
-    // 1. Time Capsule Check
+    // 1. Secret Claim Request Bubble Check
+    const isSecretClaim = msg.message && msg.message.startsWith('__SECRET_CLAIM_REQ__:');
+    if (isSecretClaim) {
+      if (msg.recipient_id !== currentUser.id) {
+        setBlockedHint({
+          id: msg.id,
+          text: 'Klaim diajukan olehmu. Menunggu konfirmasi pasangan agar hadiah pelet cair.',
+        });
+        setTimeout(() => setBlockedHint(null), 3500);
+        return;
+      }
+      onOpenBubble(msg);
+      return;
+    }
+
+    // 2. Time Capsule Check
     if (msg.is_capsule && msg.unlock_at) {
       const unlockTime = new Date(msg.unlock_at).getTime();
       if (!isNaN(unlockTime) && now < unlockTime) {
@@ -50,7 +65,7 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
       }
     }
 
-    // 2. Recipient Identity Lock Check
+    // 3. Recipient Identity Lock Check
     if (msg.recipient_id !== currentUser.id) {
       const partnerName = msg.sender_role === 'candut' ? 'Saridut' : 'Candut';
       setBlockedHint({
@@ -61,7 +76,7 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
       return;
     }
 
-    // 3. Open Message
+    // 4. Open Message
     const res = openBubbleMessage(msg.id);
     if (res.success && res.message) {
       onOpenBubble(res.message);
@@ -107,6 +122,7 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
         const isTimeCapsule = !!msg.is_capsule;
         const isCapsuleLocked = isTimeCapsule && msg.unlock_at && (now > 0 ? now < new Date(msg.unlock_at).getTime() : true);
         const hasVoiceNote = !!msg.audio_url;
+        const isSecretClaim = msg.message && msg.message.startsWith('__SECRET_CLAIM_REQ__:');
 
         const floatDelay = (index * 0.8) % 3;
         const floatDuration = isTimeCapsule ? 6.5 : (4.5 + (index % 2));
@@ -122,7 +138,7 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
             className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group"
             onClick={(e) => handleBubbleClick(e, msg)}
           >
-            {/* Iridescent Realistic Glass Bubble OR Time Capsule Bottle */}
+            {/* Iridescent Realistic Glass Bubble, Time Capsule Bottle, OR Secret Claim Lock */}
             {isTimeCapsule ? (
               <div className="relative flex flex-col items-center justify-center transition-all duration-300 group-hover:scale-110">
                 {/* Ambient underwater glow */}
@@ -152,6 +168,24 @@ export function FloatingBubbles({ onOpenBubble }: FloatingBubblesProps) {
 
                 <span className="text-[9px] font-bold tracking-wider uppercase text-amber-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] mt-0.5 px-2 py-0.5 rounded-full bg-[#182C3A]/60 backdrop-blur-2xs border border-amber-300/30">
                   {isCapsuleLocked ? 'Kapsul Waktu' : 'Kapsul Terbuka!'}
+                </span>
+              </div>
+            ) : isSecretClaim ? (
+              /* Glowing Heart-Lock Claim Bubble */
+              <div className="relative flex flex-col items-center justify-center transition-all duration-300 group-hover:scale-110">
+                <div className="absolute -inset-1 rounded-full blur-xs bg-rose-400/35 animate-pulse" />
+                <div className="w-12 h-12 md:w-14 md:h-14 relative flex items-center justify-center">
+                  <img
+                    src="/icons/heart_lock.png"
+                    alt="Klaim Rahasia"
+                    className="w-full h-full object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.4)]"
+                  />
+                  <div className="absolute -bottom-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-600 text-white p-1 rounded-full shadow-md border border-white/70 animate-bounce">
+                    <Heart className="w-2.5 h-2.5 fill-white" />
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold tracking-wider uppercase text-rose-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] mt-0.5 px-2 py-0.5 rounded-full bg-[#182C3A]/70 backdrop-blur-2xs border border-rose-300/40">
+                  {isRecipient ? 'Konfirmasi Klaim 💕' : 'Menunggu Pasangan ⏳'}
                 </span>
               </div>
             ) : (

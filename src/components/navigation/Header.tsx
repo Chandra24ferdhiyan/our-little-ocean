@@ -22,7 +22,7 @@ export function Header({
   onOpenHistory,
   onOpenMilestone,
 }: HeaderProps) {
-  const { aquarium, currentUser, feedFish } = useAquarium();
+  const { aquarium, currentUser, feedFish, isPartnerOnline } = useAquarium();
   const [muted, setMutedState] = useState(getIsMuted());
 
   const milestone = getMilestoneForLevel(aquarium.current_level);
@@ -40,16 +40,29 @@ export function Header({
         
         {/* Row 1 on Mobile: Logo Brand & Mobile Audio Toggle */}
         <div className="flex items-center justify-between w-full md:w-auto shrink-0">
-          <div className="flex items-center">
+          <div className="flex items-center space-x-2">
             <img
               src="/brand-logo.png"
               alt="Candut & Saridut — Our Little Ocean"
-              className="h-11 sm:h-12 lg:h-14 w-auto object-contain max-w-[240px] sm:max-w-[290px] lg:max-w-[340px] transition-all drop-shadow-md select-none"
+              className="h-11 sm:h-12 lg:h-14 w-auto object-contain max-w-[210px] sm:max-w-[290px] lg:max-w-[340px] transition-all drop-shadow-md select-none"
             />
+            {isPartnerOnline && (
+              <span className="hidden sm:inline-flex md:hidden items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Berenang Bersama 💕</span>
+              </span>
+            )}
           </div>
 
           {/* Role Indicator & Audio Mute Button on Mobile only (< md) */}
-          <div className="flex md:hidden items-center space-x-2">
+          <div className="flex md:hidden items-center space-x-1.5">
+            {isPartnerOnline && (
+              <span className="sm:hidden flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Live 💕</span>
+              </span>
+            )}
+
             <button
               onClick={onOpenCouple}
               title="Ganti peran atau kelola profil"
@@ -166,6 +179,17 @@ export function Header({
               className="w-4 h-4 object-contain"
             />
           </button>
+
+          {/* Live Couple Presence Badge on Desktop */}
+          {isPartnerOnline && (
+            <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-xs animate-pulse">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Berenang Bersama (Live) 💕</span>
+            </div>
+          )}
 
           {/* Pasangan (Tampil di Desktop lg+) */}
           <button
