@@ -109,14 +109,14 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       const cKey = `candut_${stage}`;
       if (!fishSpritesRef.current[cKey]) {
         const cImg = new Image();
-        cImg.src = `/fish/candut_stage${stage}.png?v=5`;
+        cImg.src = `/fish/candut_stage${stage}.png?v=6`;
         fishSpritesRef.current[cKey] = cImg;
       }
 
       const rKey = `repa_${stage}`;
       if (!fishSpritesRef.current[rKey]) {
         const rImg = new Image();
-        rImg.src = `/fish/repa_stage${stage}.png?v=5`;
+        rImg.src = `/fish/repa_stage${stage}.png?v=6`;
         fishSpritesRef.current[rKey] = rImg;
       }
     }
@@ -312,7 +312,7 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     const handleResize = () => {
       const rect = container.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.max(window.devicePixelRatio || 1, 2);
       const targetW = Math.round(rect.width * dpr);
       const targetH = Math.round(rect.height * dpr);
       if (canvas.width !== targetW || canvas.height !== targetH) {
@@ -361,7 +361,7 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
     }
 
     const render = () => {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.max(window.devicePixelRatio || 1, 2);
       const width = canvas.width / dpr;
       const height = canvas.height / dpr;
 
@@ -373,6 +373,10 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       // Always reset transform to identity and clear the ENTIRE physical canvas buffer
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Configure high-definition image smoothing for crisp HD sprites
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       // Now scale coordinates for crisp subpixel rendering
       ctx.scale(dpr, dpr);

@@ -130,14 +130,14 @@ export function LevelRoadmapModal({ isOpen, onClose }: LevelRoadmapModalProps) {
                       <div className="flex items-center -space-x-1.5">
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#CBD7DF] p-0.5 shadow-2xs flex items-center justify-center overflow-hidden">
                           <img
-                            src={`/fish/candut_stage${m.stage}.png?v=5`}
+                            src={`/fish/candut_stage${m.stage}.png?v=6`}
                             alt={`Candut Tahap ${m.stage}`}
                             className={`w-full h-full object-contain transition-transform ${m.stage === 1 ? 'scale-[0.80]' : ''}`}
                           />
                         </div>
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#F3C5D1] p-0.5 shadow-2xs flex items-center justify-center overflow-hidden">
                           <img
-                            src={`/fish/repa_stage${m.stage}.png?v=5`}
+                            src={`/fish/repa_stage${m.stage}.png?v=6`}
                             alt={`Saridut Tahap ${m.stage}`}
                             className={`w-full h-full object-contain transition-transform ${m.stage === 1 ? 'scale-[0.80]' : ''}`}
                           />

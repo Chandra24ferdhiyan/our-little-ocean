@@ -1,131 +1,12 @@
 import os
+import sys
+from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
 import numpy as np
-from PIL import Image, ImageFilter, ImageDraw
 from collections import deque
 
 ORIG_DIR = r"C:\Users\acer\.gemini\antigravity\brain\9d22dcdd-d124-4094-9cc2-f352ecbcdd94\scratch\orig_sprites"
 PUBLIC_DIR = r"d:\aqua\public\fish"
-
-def process_fish_sprite(img_path, role):
-    im = Image.open(img_path).convert("RGBA")
-    w, h = im.size
-    arr = np.array(im)
-    rgb = arr[:, :, :3].astype(float)
-    alpha = arr[:, :, 3].astype(float)
-    
-    filename = os.path.basename(img_path)
-    is_repa4 = 'repa_stage4' in filename
-    is_repa5 = 'repa_stage5' in filename
-    is_candut5 = 'candut_stage5' in filename
-
-    # Known rectangular crop boxes at extreme corners (transparent border padding)
-    if is_repa4:
-        alpha[341:, :] = 0
-    if is_repa5:
-        alpha[:, 452:] = 0
-        alpha[410:, 130:305] = 0
-        alpha[438:, :] = 0
-    if is_candut5:
-        alpha[390:445, 460:] = 0
-        alpha[-15:, 460:] = 0
-
-    # 1. Background Flood Fill from outer image edges
-    bg_visited = np.zeros((h, w), dtype=bool)
-    q = deque()
-    for y in range(h):
-        for x in [0, w-1]:
-            if alpha[y, x] < 60:
-                bg_visited[y, x] = True
-                q.append((y, x))
-    for x in range(w):
-        for y in [0, h-1]:
-            if not bg_visited[y, x] and alpha[y, x] < 60:
-                bg_visited[y, x] = True
-                q.append((y, x))
-                
-    while q:
-        cy, cx = q.popleft()
-        for dy, dx in [(-1,0), (1,0), (0,-1), (0,1)]:
-            ny, nx = cy + dy, cx + dx
-            if 0 <= ny < h and 0 <= nx < w and not bg_visited[ny, nx]:
-                # Background: low alpha or dark edge noise touching outside
-                if alpha[ny, nx] < 35 or (alpha[ny, nx] < 120 and np.mean(rgb[ny, nx]) < 35):
-                    bg_visited[ny, nx] = True
-                    q.append((ny, nx))
-                    
-    fish_solid_envelope = ~bg_visited
-    
-    # Fill any interior holes in fish envelope
-    env_img = Image.fromarray((fish_solid_envelope * 255).astype(np.uint8), mode='L')
-    inv_img = Image.eval(env_img, lambda a: 255 if a == 0 else 0)
-    inv_arr = np.array(inv_img)
-    bg_fill = np.zeros((h, w), dtype=bool)
-    fq = deque([(0, 0), (0, w-1), (h-1, 0), (h-1, w-1)])
-    for y, x in fq: bg_fill[y, x] = True
-    while fq:
-        cy, cx = fq.popleft()
-        for dy, dx in [(-1,0), (1,0), (0,-1), (0,1)]:
-            ny, nx = cy + dy, cx + dx
-            if 0 <= ny < h and 0 <= nx < w and not bg_fill[ny, nx] and inv_arr[ny, nx] == 255:
-                bg_fill[ny, nx] = True
-                fq.append((ny, nx))
-    solid_envelope = ~bg_fill
-    
-    # 2. Eye protection mask (black pupil & specular shine)
-    eye_mask = np.zeros((h, w), dtype=bool)
-    eye_mask[int(h*0.35):int(h*0.65), int(w*0.65):int(w*0.88)] = True
-    
-    # 3. Clean Solid Body vs Fringe Zone
-    # Erode envelope by 1.2px to completely eliminate outer jagged edge and black halo
-    env_pil = Image.fromarray((solid_envelope * 255).astype(np.uint8), mode='L')
-    eroded_1 = env_pil.filter(ImageFilter.MinFilter(3)) # 1px erosion
-    
-    # Clean Interior Source (where colors are 100% genuine and not darkened by matte)
-    # Brightness threshold for clean body: Candut >= 85, Repa >= 95
-    min_clean_b = 85 if role == 'candut' else 95
-    
-    # Clean color reference mask
-    brightness = np.mean(rgb, axis=2)
-    clean_color_mask = solid_envelope & (brightness >= min_clean_b)
-    
-    # If a pixel in solid_envelope is dark (< min_clean_b) and NOT inside the eye:
-    # IT IS A BLACK MATTE FRINGE!
-    is_fringe = solid_envelope & (brightness < min_clean_b) & (~eye_mask)
-    
-    # Inpaint fringe pixels using normalized convolution from clean_color_mask!
-    clean_weight = clean_color_mask.astype(float)
-    clean_rgb = rgb * clean_weight[:, :, None]
-    
-    weight_pil = Image.fromarray((clean_weight * 255).astype(np.uint8), mode='L')
-    color_pil = Image.fromarray(clean_rgb.astype(np.uint8), mode='RGB')
-    
-    blur_w = np.array(weight_pil.filter(ImageFilter.GaussianBlur(6))).astype(float) / 255.0
-    blur_c = np.array(color_pil.filter(ImageFilter.GaussianBlur(6))).astype(float)
-    
-    infill_rgb = blur_c / np.clip(blur_w[:, :, None], 0.0001, 1.0)
-    infill_rgb = np.clip(infill_rgb, 0, 255)
-    
-    # Replace fringe pixels with infill_rgb!
-    final_rgb = rgb.copy()
-    final_rgb[is_fringe] = infill_rgb[is_fringe]
-    
-    # 4. SILKY SMOOTH, NEAT ANTI-ALIASED ALPHA MASK
-    # Subpixel Gaussian blur (radius 0.7) on eroded_1 for beautiful neat anti-aliasing
-    eroded_pil = eroded_1.filter(ImageFilter.GaussianBlur(0.7))
-    arr_e = np.array(eroded_pil).astype(float) / 255.0
-    
-    # Rescale alpha: 0.12 to 0.70 maps to 0 to 255
-    final_alpha = np.clip((arr_e - 0.12) / (0.70 - 0.12), 0.0, 1.0) * 255.0
-    
-    # Everything inside the body (final_alpha > 220) is 100% SOLID OPAQUE (255)!
-    final_alpha[final_alpha > 220] = 255.0
-    final_alpha[final_alpha < 15] = 0.0
-    
-    # Outside envelope: strictly 0
-    final_alpha[~solid_envelope] = 0.0
-    
-    out_arr = np.dstack([final_rgb, final_alpha]).astype(np.uint8)
-    return Image.fromarray(out_arr, mode='RGBA')
+os.makedirs(PUBLIC_DIR, exist_ok=True)
 
 def make_chibi_baby_sprite(im, role):
     w, h = im.size
@@ -220,35 +101,175 @@ def make_chibi_baby_sprite(im, role):
 
     return Image.fromarray(baby_arr, mode='RGBA')
 
+def process_fish_hd(fname, role, stage):
+    in_path = os.path.join(ORIG_DIR, fname)
+    im = Image.open(in_path).convert("RGBA")
+    w, h = im.size
+    arr = np.array(im)
+    rgb = arr[:, :, :3].astype(float)
+    alpha = arr[:, :, 3].astype(float)
+
+    # 1. Clean known rectangular cut artifacts at extreme image boundaries
+    if fname == 'repa_stage4.png':
+        alpha[340:, :] = 0
+        alpha[:, :3] = 0
+    elif fname == 'repa_stage5.png':
+        alpha[:, 450:] = 0
+        alpha[410:, 130:305] = 0
+        alpha[435:, :] = 0
+    elif fname == 'candut_stage5.png':
+        alpha[375:445, 460:] = 0
+        alpha[-15:, 460:] = 0
+        alpha[-3:, :] = 0
+    elif fname == 'candut_stage4.png':
+        alpha[-3:, :] = 0
+    elif fname == 'repa_stage2.png':
+        alpha[:, -4:] = 0
+    elif fname == 'repa_stage3.png':
+        alpha[:, :4] = 0
+
+    # 2. Flood fill background from 4 outer boundaries
+    bg_visited = np.zeros((h, w), dtype=bool)
+    q = deque()
+    for y in range(h):
+        for x in [0, w - 1]:
+            if alpha[y, x] < 60:
+                bg_visited[y, x] = True
+                q.append((y, x))
+    for x in range(w):
+        for y in [0, h - 1]:
+            if not bg_visited[y, x] and alpha[y, x] < 60:
+                bg_visited[y, x] = True
+                q.append((y, x))
+
+    while q:
+        cy, cx = q.popleft()
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not bg_visited[ny, nx]:
+                if alpha[ny, nx] < 40 or (alpha[ny, nx] < 120 and np.mean(rgb[ny, nx]) < 35):
+                    bg_visited[ny, nx] = True
+                    q.append((ny, nx))
+
+    fish_envelope = ~bg_visited
+
+    # 3. Fill all interior holes in fish envelope so body is 100% solid
+    env_img = Image.fromarray((fish_envelope * 255).astype(np.uint8), mode='L')
+    inv_img = Image.eval(env_img, lambda a: 255 if a == 0 else 0)
+    inv_arr = np.array(inv_img)
+    bg_fill = np.zeros((h, w), dtype=bool)
+    fq = deque([(0, 0), (0, w - 1), (h - 1, 0), (h - 1, w - 1)])
+    for y, x in fq: bg_fill[y, x] = True
+    while fq:
+        cy, cx = fq.popleft()
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not bg_fill[ny, nx] and inv_arr[ny, nx] == 255:
+                bg_fill[ny, nx] = True
+                fq.append((ny, nx))
+    solid_envelope = ~bg_fill
+
+    # 4. Eye protection mask (keep pupils black and catchlights shiny)
+    eye_mask = np.zeros((h, w), dtype=bool)
+    eye_mask[int(h * 0.35):int(h * 0.65), int(w * 0.65):int(w * 0.88)] = True
+
+    # 5. Clean Color Extraction & Fringe Inpainting
+    min_clean_b = 85 if role == 'candut' else 95
+    brightness = np.mean(rgb, axis=2)
+    clean_color_mask = solid_envelope & (brightness >= min_clean_b)
+    is_fringe = solid_envelope & (brightness < min_clean_b) & (~eye_mask)
+
+    clean_weight = clean_color_mask.astype(float)
+    clean_rgb = rgb * clean_weight[:, :, None]
+
+    weight_pil = Image.fromarray((clean_weight * 255).astype(np.uint8), mode='L')
+    color_pil = Image.fromarray(clean_rgb.astype(np.uint8), mode='RGB')
+
+    blur_w = np.array(weight_pil.filter(ImageFilter.GaussianBlur(6))).astype(float) / 255.0
+    blur_c = np.array(color_pil.filter(ImageFilter.GaussianBlur(6))).astype(float)
+
+    infill_rgb = blur_c / np.clip(blur_w[:, :, None], 0.0001, 1.0)
+    infill_rgb = np.clip(infill_rgb, 0, 255)
+
+    final_rgb = rgb.copy()
+    final_rgb[is_fringe] = infill_rgb[is_fringe]
+
+    # Erode envelope by 1px to shed black matte fringe
+    env_pil = Image.fromarray((solid_envelope * 255).astype(np.uint8), mode='L')
+    eroded_1 = env_pil.filter(ImageFilter.MinFilter(3))
+    eroded_pil = eroded_1.filter(ImageFilter.GaussianBlur(0.7))
+    arr_e = np.array(eroded_pil).astype(float) / 255.0
+
+    # Rescale alpha: 0.12 to 0.70 maps to 0 to 255
+    final_alpha = np.clip((arr_e - 0.12) / (0.70 - 0.12), 0.0, 1.0) * 255.0
+    final_alpha[final_alpha > 220] = 255.0
+    final_alpha[final_alpha < 15] = 0.0
+    final_alpha[~solid_envelope] = 0.0
+
+    base_cleaned = Image.fromarray(np.dstack([final_rgb, final_alpha]).astype(np.uint8), mode='RGBA')
+
+    # If stage 1, apply adorable chibi fry transformations
+    if stage == 1:
+        base_cleaned = make_chibi_baby_sprite(base_cleaned, role)
+
+    # 6. HD 2X SUPERSAMPLING (LANCZOS RESAMPLING)
+    hd_w, hd_h = w * 2, h * 2
+    hd_im = base_cleaned.resize((hd_w, hd_h), resample=Image.Resampling.LANCZOS)
+
+    # 7. HD UNSHARP MASK SHARPENING & CONTRAST
+    hd_arr = np.array(hd_im).astype(float)
+    hd_rgb = hd_arr[:, :, :3]
+    hd_alpha = hd_arr[:, :, 3]
+
+    hd_rgb_pil = Image.fromarray(hd_rgb.astype(np.uint8), mode='RGB')
+    hd_sharpened = hd_rgb_pil.filter(ImageFilter.UnsharpMask(radius=1.8, percent=130, threshold=2))
+
+    enhancer = ImageEnhance.Color(hd_sharpened)
+    hd_vibrant = enhancer.enhance(1.06)
+    contrast_enhancer = ImageEnhance.Contrast(hd_vibrant)
+    hd_crisp_rgb = np.array(contrast_enhancer.enhance(1.03)).astype(float)
+
+    # 8. HD SILKY SUBPIXEL CONTOUR BLENDING
+    hd_a_pil = Image.fromarray(hd_alpha.astype(np.uint8), mode='L')
+    hd_a_smooth = np.array(hd_a_pil.filter(ImageFilter.GaussianBlur(0.8))).astype(float)
+
+    hd_final_alpha = np.clip((hd_a_smooth - 20) / (220 - 20), 0.0, 1.0) * 255.0
+    hd_final_alpha[hd_final_alpha > 200] = 255.0
+    hd_final_alpha[hd_final_alpha < 15] = 0.0
+
+    # Ensure edge pixels in HD are padded with clean fish color
+    hd_edge = (hd_final_alpha > 0) & (hd_final_alpha < 250)
+    hd_edge_b = np.mean(hd_crisp_rgb, axis=2)
+    dark_hd_edge = hd_edge & (hd_edge_b < (80 if role == 'candut' else 95))
+
+    hd_clean = (hd_final_alpha == 255) & (hd_edge_b >= (80 if role == 'candut' else 95))
+    if np.sum(hd_clean) > 0 and np.sum(dark_hd_edge) > 0:
+        hd_clean_w = hd_clean.astype(float)
+        hd_clean_c = hd_crisp_rgb * hd_clean_w[:, :, None]
+        hd_w_pil = Image.fromarray((hd_clean_w * 255).astype(np.uint8), mode='L').filter(ImageFilter.GaussianBlur(12))
+        hd_c_pil = Image.fromarray(hd_clean_c.astype(np.uint8), mode='RGB').filter(ImageFilter.GaussianBlur(12))
+        hd_bw = np.array(hd_w_pil).astype(float) / 255.0
+        hd_bc = np.array(hd_c_pil).astype(float)
+        hd_infill = hd_bc / np.clip(hd_bw[:, :, None], 0.0001, 1.0)
+        hd_crisp_rgb[dark_hd_edge] = hd_infill[dark_hd_edge]
+
+    final_hd_arr = np.dstack([hd_crisp_rgb, hd_final_alpha]).astype(np.uint8)
+    final_hd_im = Image.fromarray(final_hd_arr, mode='RGBA')
+
+    out_p = os.path.join(PUBLIC_DIR, fname)
+    final_hd_im.save(out_p)
+
+    solid_pct = np.sum(hd_final_alpha == 255) / np.sum(hd_final_alpha > 0) * 100
+    dark_edge_count = np.sum((hd_final_alpha > 10) & (hd_final_alpha < 240) & (np.mean(hd_crisp_rgb, axis=2) < 50))
+    print(f"Saved {fname:18s} -> HD ({hd_w}x{hd_h}): Solid={solid_pct:.1f}%, Dark edge pixels (<50)={dark_edge_count}")
+
 def main():
-    print("=== Processing All 10 Sprites to public/fish ===")
+    print("=== Generating True HD Fish Sprites into public/fish ===")
     for stage in range(1, 6):
         for role in ['candut', 'repa']:
             fname = f"{role}_stage{stage}.png"
-            in_path = os.path.join(ORIG_DIR, fname)
-            out_path = os.path.join(PUBLIC_DIR, fname)
-            
-            cleaned = process_fish_sprite(in_path, role)
-            if stage == 1:
-                final = make_chibi_baby_sprite(cleaned, role)
-            else:
-                final = cleaned
-                
-            final.save(out_path)
-            
-            arr = np.array(final)
-            a = arr[:, :, 3]
-            rgb = arr[:, :, :3]
-            padded_zero = np.pad(a < 10, 1, mode='constant', constant_values=True)
-            has_zero_nbr = (
-                padded_zero[:-2, 1:-1] | padded_zero[2:, 1:-1] |
-                padded_zero[1:-1, :-2] | padded_zero[1:-1, 2:]
-            )
-            edge_m = (a > 10) & has_zero_nbr
-            edge_b = np.mean(rgb[edge_m], axis=1)
-            
-            solid_pct = np.sum(a == 255) / np.sum(a > 0) * 100
-            print(f"Saved {fname}: Solid={solid_pct:.1f}%, Edge mean brightness={np.mean(edge_b):.1f}, Edge < 50: {np.sum(edge_b < 50)}/{len(edge_b)}")
+            process_fish_hd(fname, role, stage)
+    print("=== All 10 HD sprites generated successfully! ===")
 
 if __name__ == '__main__':
     main()
