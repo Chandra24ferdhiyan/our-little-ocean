@@ -109,14 +109,14 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       const cKey = `candut_${stage}`;
       if (!fishSpritesRef.current[cKey]) {
         const cImg = new Image();
-        cImg.src = `/fish/candut_stage${stage}.png?v=7`;
+        cImg.src = `/fish/candut_stage${stage}.png?v=8`;
         fishSpritesRef.current[cKey] = cImg;
       }
 
       const rKey = `repa_${stage}`;
       if (!fishSpritesRef.current[rKey]) {
         const rImg = new Image();
-        rImg.src = `/fish/repa_stage${stage}.png?v=7`;
+        rImg.src = `/fish/repa_stage${stage}.png?v=8`;
         fishSpritesRef.current[rKey] = rImg;
       }
     }

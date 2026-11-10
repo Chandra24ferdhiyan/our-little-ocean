@@ -1,118 +1,41 @@
 import os
 import sys
-from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
 import numpy as np
-import colorsys
-import math
+from collections import deque
 
-MASTER_PINK_PATH = r"C:\Users\acer\.gemini\antigravity\brain\9d22dcdd-d124-4094-9cc2-f352ecbcdd94\.user_uploaded\media_1794330160554_bcdc1f41.png"
+ORIG_DIR = r"C:\Users\acer\.gemini\antigravity\brain\9d22dcdd-d124-4094-9cc2-f352ecbcdd94\scratch\orig_sprites"
 PUBLIC_DIR = r"d:\aqua\public\fish"
 os.makedirs(PUBLIC_DIR, exist_ok=True)
 
-# -------------------------------------------------------------
-# Base Stage 2: Master Sprites
-# -------------------------------------------------------------
-def get_clean_repa_stage2():
-    im = Image.open(MASTER_PINK_PATH).convert("RGBA")
-    arr = np.array(im)
-    a = arr[:, :, 3].copy()
-    a[a > 180] = 255
-    arr[:, :, 3] = a
-    return Image.fromarray(arr, mode='RGBA')
-
-def get_clean_candut_stage2(repa_im):
-    w, h = repa_im.size
-    arr = np.array(repa_im).astype(float)
-    r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
-    out_rgb = np.zeros((h, w, 3), dtype=np.uint8)
-
-    for y in range(h):
-        for x in range(w):
-            if a[y, x] > 5:
-                hv, sv, vv = colorsys.rgb_to_hsv(r[y, x] / 255.0, g[y, x] / 255.0, b[y, x] / 255.0)
-                is_mouth = (x > 910 and 420 < y < 490 and (0.95 < hv or hv < 0.05)) and sv > 0.6
-                is_eye_pupil = (725 < x < 880 and 440 < y < 600) and vv < 0.15 and sv < 0.4
-                
-                if is_mouth:
-                    new_h, new_s, new_v = hv, sv, vv
-                elif is_eye_pupil:
-                    new_h, new_s, new_v = 0.58, 0.0, vv
-                elif sv < 0.08:
-                    new_h, new_s, new_v = hv, sv, vv
-                else:
-                    new_h = (hv - 0.35) % 1.0
-                    new_s = sv * 0.95
-                    new_v = max(0.22, vv) if vv > 0 else 0
-
-                nr, ng, nb = colorsys.hsv_to_rgb(new_h, new_s, new_v)
-                out_rgb[y, x] = [int(nr * 255), int(ng * 255), int(nb * 255)]
-
-    final_alpha = a.copy()
-    final_alpha[final_alpha > 180] = 255
-    return Image.fromarray(np.dstack([out_rgb, final_alpha.astype(np.uint8)]), mode='RGBA')
-
-# -------------------------------------------------------------
-# Clean Defringing Post-Process Helper
-# -------------------------------------------------------------
-def clean_defringe(im, role):
+def make_chibi_baby_sprite(im, role):
     w, h = im.size
-    arr = np.array(im).astype(float)
-    rgb = arr[:, :, :3]
-    alpha = arr[:, :, 3]
+    arr = np.array(im).astype(np.float32)
 
-    alpha[alpha > 190] = 255
-    alpha[alpha < 12] = 0
+    eye_x, eye_y = (int(w * 0.76), int(h * 0.50))
 
-    edge = (alpha > 5) & (alpha < 240)
-    b = np.mean(rgb, axis=2)
-    dark_edge = edge & (b < 45)
-
-    if np.sum(dark_edge) > 0:
-        clean_solid = (alpha == 255) & (b > 60)
-        if np.sum(clean_solid) > 0:
-            solid_weight = clean_solid.astype(float)
-            solid_rgb = rgb * solid_weight[:, :, None]
-            w_pil = Image.fromarray((solid_weight * 255).astype(np.uint8), mode='L').filter(ImageFilter.GaussianBlur(8))
-            c_pil = Image.fromarray(solid_rgb.astype(np.uint8), mode='RGB').filter(ImageFilter.GaussianBlur(8))
-            bw = np.array(w_pil).astype(float) / 255.0
-            bc = np.array(c_pil).astype(float)
-            infill = bc / np.clip(bw[:, :, None], 0.0001, 1.0)
-            rgb[dark_edge] = infill[dark_edge]
-
-    final_arr = np.dstack([rgb, alpha]).astype(np.uint8)
-    return Image.fromarray(final_arr, mode='RGBA')
-
-# -------------------------------------------------------------
-# Stage 1: Chibi Baby Fry
-# -------------------------------------------------------------
-def make_stage1(base_im, role):
-    w, h = base_im.size
-    arr = np.array(base_im).astype(np.float32)
-
-    eye_x, eye_y = 800.0, 380.0
     y_coords, x_coords = np.mgrid[0:h, 0:w]
-    bc_x, bc_y = w * 0.48, h * 0.52
+    bc_x, bc_y = w * 0.52, h * 0.54
     nx = (x_coords - bc_x) / (w * 0.5)
     ny = (y_coords - bc_y) / (h * 0.5)
 
     warp_x = x_coords.copy().astype(float)
     warp_y = y_coords.copy().astype(float)
 
-    # Shorter compact baby tail
-    tail_factor = np.clip(-nx, 0, 1) ** 1.2
-    warp_x += tail_factor * 28.0
+    # Shorter, rounder baby tail and compact baby silhouette
+    warp_x += np.clip(-nx, 0, 1) ** 1.3 * 18.0
 
     # Chubby baby tummy
     dist_body = np.hypot(nx, ny)
-    bulge = np.exp(-dist_body ** 2 / 0.52)
-    warp_x -= nx * bulge * 14.0
-    warp_y -= ny * bulge * 14.0
+    bulge = np.exp(-dist_body ** 2 / 0.45)
+    warp_x -= nx * bulge * 7.0
+    warp_y -= ny * bulge * 7.0
 
-    # Big cute baby cranium and eye
-    head_dist = np.hypot((x_coords - eye_x) / 110.0, (y_coords - eye_y) / 110.0)
-    head_bulge = np.exp(-head_dist ** 2 / 1.3) * 11.0
-    warp_x -= (x_coords - eye_x) / 110.0 * head_bulge
-    warp_y -= (y_coords - eye_y) / 110.0 * head_bulge
+    # Baby head & eye enlargement (chibi cranium)
+    head_dist = np.hypot((x_coords - eye_x) / 50.0, (y_coords - eye_y) / 50.0)
+    head_bulge = np.exp(-head_dist ** 2 / 1.2) * 6.0
+    warp_x -= (x_coords - eye_x) / 50.0 * head_bulge
+    warp_y -= (y_coords - eye_y) / 50.0 * head_bulge
 
     warp_x = np.clip(warp_x, 0, w - 1)
     warp_y = np.clip(warp_y, 0, h - 1)
@@ -136,227 +59,216 @@ def make_stage1(base_im, role):
             c10 * (1 - wx) * wy +
             c11 * wx * wy
         )
-    baby_im = Image.fromarray(warped_arr.astype(np.uint8), mode='RGBA')
+    warped_im = Image.fromarray(warped_arr.astype(np.uint8), mode='RGBA')
 
-    # Rosy / cyan baby blush on cheek
+    # Smooth baby skin on flank
+    smooth_im = warped_im.filter(ImageFilter.MedianFilter(7))
+    flank_mask = Image.new('L', (w, h), 0)
+    draw_mask = ImageDraw.Draw(flank_mask)
+    draw_mask.ellipse([int(w * 0.28), int(h * 0.28), int(w * 0.65), int(h * 0.78)], fill=210)
+    flank_mask = flank_mask.filter(ImageFilter.GaussianBlur(12))
+    warped_im = Image.composite(smooth_im, warped_im, flank_mask)
+
+    # Soft, adorable baby rosy blush on cheek
     blush_overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     blush_draw = ImageDraw.Draw(blush_overlay)
-    cheek_x, cheek_y = 810, 470
-    blush_color = (255, 120, 155, 150) if role == 'repa' else (100, 190, 255, 150)
-    for r in range(35, 0, -3):
-        a_step = int(blush_color[3] * (1.0 - r / 35.0))
-        c = (blush_color[0], blush_color[1], blush_color[2], a_step)
-        blush_draw.ellipse([cheek_x - r * 1.4, cheek_y - r * 0.9, cheek_x + r * 1.4, cheek_y + r * 0.9], fill=c)
-    baby_im = Image.alpha_composite(baby_im, blush_overlay)
+    cheek_x = int(w * 0.77)
+    cheek_y = int(h * 0.62)
+    blush_color = (255, 140, 160, 130) if role == 'candut' else (255, 110, 145, 150)
+    for r in range(16, 0, -2):
+        alpha_step = int(blush_color[3] * (1.0 - r / 16.0))
+        c = (blush_color[0], blush_color[1], blush_color[2], alpha_step)
+        blush_draw.ellipse([cheek_x - r * 1.3, cheek_y - r * 0.8, cheek_x + r * 1.3, cheek_y + r * 0.8], fill=c)
+    warped_im = Image.alpha_composite(warped_im, blush_overlay)
 
-    # Extra sparkle stars in baby eyes
-    glint_overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    glint_draw = ImageDraw.Draw(glint_overlay)
-    glint_draw.ellipse([825, 345, 848, 368], fill=(255, 255, 255, 250))
-    glint_draw.ellipse([788, 420, 804, 436], fill=(255, 255, 255, 240))
-    baby_im = Image.alpha_composite(baby_im, glint_overlay)
+    # Sparkling baby eye catchlights
+    sparkle_overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    sparkle_draw = ImageDraw.Draw(sparkle_overlay)
+    sp_x = int(w * 0.785)
+    sp_y = int(h * 0.52)
+    sparkle_draw.ellipse([sp_x - 3, sp_y - 2, sp_x + 3, sp_y + 2], fill=(255, 255, 255, 240))
+    sp2_x = int(w * 0.755)
+    sp2_y = int(h * 0.44)
+    sparkle_draw.ellipse([sp2_x - 1.5, sp2_y - 1.5, sp2_x + 1.5, sp2_y + 1.5], fill=(255, 255, 255, 230))
+    warped_im = Image.alpha_composite(warped_im, sparkle_overlay)
 
-    return clean_defringe(baby_im, role)
+    baby_arr = np.array(warped_im)
+    baby_a = baby_arr[:, :, 3]
+    baby_arr[baby_a > 120, 3] = 255
+    baby_arr[(baby_a > 0) & (baby_a <= 120), 3] = np.clip(baby_a[(baby_a > 0) & (baby_a <= 120)] * 1.5, 0, 255).astype(np.uint8)
 
-# -------------------------------------------------------------
-# Stage 3: Accessories (Sailor Hat for Candut, Flower for Saridut)
-# -------------------------------------------------------------
-def make_stage3_candut(base_im):
-    w, h = base_im.size
-    im = base_im.copy()
-    acc = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(acc)
+    return Image.fromarray(baby_arr, mode='RGBA')
 
-    # Cute anime sailor hat at x=685, y=170
-    # 1. Shadow underneath
-    draw.ellipse([640, 195, 755, 225], fill=(20, 45, 70, 70))
+def process_single_fish(fname, role, stage):
+    in_path = os.path.join(ORIG_DIR, fname)
+    im = Image.open(in_path).convert("RGBA")
+    w, h = im.size
+    arr = np.array(im)
+    rgb = arr[:, :, :3].astype(float)
+    alpha = arr[:, :, 3].astype(float)
+
+    # 1. Clean raw image corner artifacts at extreme boundaries
+    if fname == 'repa_stage4.png':
+        alpha[340:, :] = 0
+        alpha[:, :3] = 0
+    elif fname == 'repa_stage5.png':
+        alpha[:, 450:] = 0
+        alpha[410:, 130:305] = 0
+        alpha[435:, :] = 0
+    elif fname == 'candut_stage5.png':
+        alpha[375:445, 460:] = 0
+        alpha[-15:, 460:] = 0
+        alpha[-3:, :] = 0
+    elif fname == 'candut_stage4.png':
+        alpha[-3:, :] = 0
+    elif fname == 'repa_stage2.png':
+        alpha[:, -4:] = 0
+    elif fname == 'repa_stage3.png':
+        alpha[:, :4] = 0
+
+    # 2. Flood fill background from 4 outer boundaries
+    bg_visited = np.zeros((h, w), dtype=bool)
+    q = deque()
+    for y in range(h):
+        for x in [0, w - 1]:
+            if alpha[y, x] < 60:
+                bg_visited[y, x] = True
+                q.append((y, x))
+    for x in range(w):
+        for y in [0, h - 1]:
+            if not bg_visited[y, x] and alpha[y, x] < 60:
+                bg_visited[y, x] = True
+                q.append((y, x))
+
+    while q:
+        cy, cx = q.popleft()
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not bg_visited[ny, nx]:
+                if alpha[ny, nx] < 40 or (alpha[ny, nx] < 120 and np.mean(rgb[ny, nx]) < 35):
+                    bg_visited[ny, nx] = True
+                    q.append((ny, nx))
+
+    fish_envelope = ~bg_visited
+
+    # 3. Fill interior holes in envelope so body is 100% solid
+    env_img = Image.fromarray((fish_envelope * 255).astype(np.uint8), mode='L')
+    inv_img = Image.eval(env_img, lambda a: 255 if a == 0 else 0)
+    inv_arr = np.array(inv_img)
+    bg_fill = np.zeros((h, w), dtype=bool)
+    fq = deque([(0, 0), (0, w - 1), (h - 1, 0), (h - 1, w - 1)])
+    for y, x in fq: bg_fill[y, x] = True
+    while fq:
+        cy, cx = fq.popleft()
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not bg_fill[ny, nx] and inv_arr[ny, nx] == 255:
+                bg_fill[ny, nx] = True
+                fq.append((ny, nx))
+    solid_envelope = ~bg_fill
+
+    # 4. Eye protection mask (black pupil)
+    eye_mask = np.zeros((h, w), dtype=bool)
+    eye_mask[int(h * 0.35):int(h * 0.65), int(w * 0.65):int(w * 0.88)] = True
+
+    # 5. Erode outer black fringe shell by 1.5 - 2 pixels
+    env_pil = Image.fromarray((solid_envelope * 255).astype(np.uint8), mode='L')
+    eroded_shell = env_pil.filter(ImageFilter.MinFilter(3))
+    eroded_shell = eroded_shell.filter(ImageFilter.MinFilter(3))
+    arr_eroded = np.array(eroded_shell) > 128
+
+    # Clean interior color extraction
+    min_clean_b = 75 if role == 'candut' else 85
+    brightness = np.mean(rgb, axis=2)
+    clean_color_mask = arr_eroded & (brightness >= min_clean_b)
+
+    # Inpaint fringe zone outward using normalized convolution
+    clean_weight = clean_color_mask.astype(float)
+    clean_rgb = rgb * clean_weight[:, :, None]
+
+    w_pil = Image.fromarray((clean_weight * 255).astype(np.uint8), mode='L').filter(ImageFilter.GaussianBlur(8))
+    c_pil = Image.fromarray(clean_rgb.astype(np.uint8), mode='RGB').filter(ImageFilter.GaussianBlur(8))
+    bw = np.array(w_pil).astype(float) / 255.0
+    bc = np.array(c_pil).astype(float)
+    infill_rgb = bc / np.clip(bw[:, :, None], 0.0001, 1.0)
+    infill_rgb = np.clip(infill_rgb, 0, 255)
+
+    # Replace dark fringe pixels
+    is_fringe = solid_envelope & (brightness < min_clean_b) & (~eye_mask)
+    clean_rgb_map = rgb.copy()
+    clean_rgb_map[is_fringe] = infill_rgb[is_fringe]
+
+    # Reconstruct silky smooth contour
+    eroded_smooth = np.array(eroded_shell.filter(ImageFilter.GaussianBlur(0.8))).astype(float) / 255.0
+    smooth_alpha = np.clip((eroded_smooth - 0.15) / (0.75 - 0.15), 0.0, 1.0) * 255.0
+    smooth_alpha[smooth_alpha > 210] = 255.0
+    smooth_alpha[smooth_alpha < 15] = 0.0
+    smooth_alpha[~solid_envelope] = 0.0
+
+    base_cleaned = Image.fromarray(np.dstack([clean_rgb_map, smooth_alpha]).astype(np.uint8), mode='RGBA')
+
+    # If stage 1, apply adorable chibi fry transformations
+    if stage == 1:
+        base_cleaned = make_chibi_baby_sprite(base_cleaned, role)
+
+    # 6. HD 2X UPSCALE (LANCZOS RESAMPLING)
+    hd_w, hd_h = w * 2, h * 2
+    hd_im = base_cleaned.resize((hd_w, hd_h), resample=Image.Resampling.LANCZOS)
+
+    # 7. HD CRISP UNSHARP MASKING & COLOR POLISH
+    hd_arr = np.array(hd_im).astype(float)
+    hd_rgb = hd_arr[:, :, :3]
+    hd_alpha = hd_arr[:, :, 3]
+
+    hd_rgb_pil = Image.fromarray(hd_rgb.astype(np.uint8), mode='RGB')
+    hd_sharpened = hd_rgb_pil.filter(ImageFilter.UnsharpMask(radius=1.6, percent=125, threshold=1))
     
-    # 2. Dark navy brim band
-    draw.polygon([
-        (645, 202), (695, 192), (748, 200), (745, 218), (695, 222), (643, 216)
-    ], fill=(18, 38, 68, 255))
-    draw.line([(645, 202), (695, 192), (748, 200), (745, 218), (695, 222), (643, 216), (645, 202)], fill=(10, 20, 40, 255), width=3)
+    enhancer = ImageEnhance.Color(hd_sharpened)
+    hd_vibrant = enhancer.enhance(1.05)
+    contrast_enhancer = ImageEnhance.Contrast(hd_vibrant)
+    hd_crisp_rgb = np.array(contrast_enhancer.enhance(1.02)).astype(float)
 
-    # 3. Crisp white sailor cap crown
-    draw.polygon([
-        (650, 198), (642, 160), (670, 138), (722, 142), (744, 168), (742, 198)
-    ], fill=(255, 255, 255, 255))
-    draw.polygon([
-        (650, 198), (642, 160), (670, 138), (680, 194)
-    ], fill=(225, 235, 248, 255))
-    draw.line([
-        (650, 198), (642, 160), (670, 138), (722, 142), (744, 168), (742, 198)
-    ], fill=(30, 50, 80, 255), width=3)
+    # HD Alpha re-tightening
+    hd_a_pil = Image.fromarray(hd_alpha.astype(np.uint8), mode='L')
+    hd_a_smooth = np.array(hd_a_pil.filter(ImageFilter.GaussianBlur(0.8))).astype(float)
+    hd_final_alpha = np.clip((hd_a_smooth - 20) / (220 - 20), 0.0, 1.0) * 255.0
+    hd_final_alpha[hd_final_alpha > 200] = 255.0
+    hd_final_alpha[hd_final_alpha < 15] = 0.0
 
-    # 4. Golden Anchor Insignia on navy brim
-    draw.ellipse([690, 197, 702, 209], outline=(255, 215, 60, 255), width=2)
-    draw.line([(696, 204), (696, 219)], fill=(255, 215, 60, 255), width=2)
-    draw.line([(691, 208), (701, 208)], fill=(255, 215, 60, 255), width=2)
-    draw.arc([689, 210, 703, 221], start=0, end=180, fill=(255, 215, 60, 255), width=2)
+    # Ensure edge pixels in HD are padded with clean fish color
+    hd_edge = (hd_final_alpha > 0) & (hd_final_alpha < 240)
+    hd_edge_b = np.mean(hd_crisp_rgb, axis=2)
+    dark_hd_edge = hd_edge & (hd_edge_b < (70 if role == 'candut' else 80))
 
-    acc = acc.filter(ImageFilter.GaussianBlur(0.4))
-    im.alpha_composite(acc)
-    return clean_defringe(im, 'candut')
+    if np.sum(dark_hd_edge) > 0:
+        hd_clean = (hd_final_alpha == 255) & (hd_edge_b >= (70 if role == 'candut' else 80))
+        if np.sum(hd_clean) > 0:
+            hd_clean_w = hd_clean.astype(float)
+            hd_clean_c = hd_crisp_rgb * hd_clean_w[:, :, None]
+            hd_w_pil = Image.fromarray((hd_clean_w * 255).astype(np.uint8), mode='L').filter(ImageFilter.GaussianBlur(14))
+            hd_c_pil = Image.fromarray(hd_clean_c.astype(np.uint8), mode='RGB').filter(ImageFilter.GaussianBlur(14))
+            hd_bw = np.array(hd_w_pil).astype(float) / 255.0
+            hd_bc = np.array(hd_c_pil).astype(float)
+            hd_infill = hd_bc / np.clip(hd_bw[:, :, None], 0.0001, 1.0)
+            hd_crisp_rgb[dark_hd_edge] = hd_infill[dark_hd_edge]
 
-def make_stage3_repa(base_im):
-    w, h = base_im.size
-    im = base_im.copy()
-    acc = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(acc)
+    final_hd_arr = np.dstack([hd_crisp_rgb, hd_final_alpha]).astype(np.uint8)
+    final_hd_im = Image.fromarray(final_hd_arr, mode='RGBA')
 
-    cx, cy = 695, 190
-    draw.ellipse([cx - 45, cy - 35, cx + 45, cy + 50], fill=(80, 20, 45, 60))
+    out_p = os.path.join(PUBLIC_DIR, fname)
+    final_hd_im.save(out_p)
 
-    petal_len = 38
-    petal_w = 22
-    for i in range(5):
-        angle = i * (2 * math.pi / 5) - math.pi / 2
-        px = cx + math.cos(angle) * petal_len
-        py = cy + math.sin(angle) * petal_len
-        
-        draw.ellipse([
-            px - petal_w, py - petal_w, px + petal_w, py + petal_w
-        ], fill=(255, 160, 195, 255), outline=(180, 40, 90, 255), width=3)
-        draw.ellipse([
-            px - petal_w * 0.65, py - petal_w * 0.65, px + petal_w * 0.65, py + petal_w * 0.65
-        ], fill=(255, 215, 235, 255))
-
-    for i in range(8):
-        angle = i * (2 * math.pi / 8)
-        sx = cx + math.cos(angle) * 16
-        sy = cy + math.sin(angle) * 16
-        draw.line([(cx, cy), (sx, sy)], fill=(255, 220, 80, 255), width=2)
-        draw.ellipse([sx - 2, sy - 2, sx + 2, sy + 2], fill=(255, 235, 120, 255))
-
-    draw.ellipse([cx - 13, cy - 13, cx + 13, cy + 13], fill=(255, 255, 255, 255), outline=(220, 180, 200, 255), width=2)
-    draw.ellipse([cx - 7, cy - 7, cx - 2, cy - 2], fill=(255, 255, 255, 255))
-
-    acc = acc.filter(ImageFilter.GaussianBlur(0.4))
-    im.alpha_composite(acc)
-    return clean_defringe(im, 'repa')
-
-# -------------------------------------------------------------
-# Stage 4: Extended Flowing Butterfly Veil Fins
-# -------------------------------------------------------------
-def make_stage4(base_im, role):
-    w, h = base_im.size
-    im = base_im.copy()
-    
-    veil_layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    v_draw = ImageDraw.Draw(veil_layer)
-    
-    base_color = (130, 210, 255) if role == 'candut' else (255, 165, 210)
-    rim_color = (40, 120, 220) if role == 'candut' else (210, 50, 120)
-
-    ribbons = [
-        [(220, 250), (165, 200), (105, 175), (55, 195), (75, 225), (135, 230), (200, 275)],
-        [(175, 340), (115, 330), (60, 370), (45, 410), (85, 420), (145, 380), (195, 360)],
-        [(220, 430), (165, 470), (105, 515), (60, 540), (80, 565), (140, 525), (210, 460)],
-    ]
-
-    for rib in ribbons:
-        v_draw.polygon(rib, fill=(base_color[0], base_color[1], base_color[2], 160))
-        v_draw.line(rib + [rib[0]], fill=(rim_color[0], rim_color[1], rim_color[2], 230), width=3)
-        inner_shine = [(p[0] + 5, p[1] - 3) for p in rib[:4]]
-        v_draw.line(inner_shine, fill=(255, 255, 255, 200), width=2)
-
-    veil_layer = veil_layer.filter(ImageFilter.GaussianBlur(0.6))
-    composite_im = Image.alpha_composite(veil_layer, im)
-    return clean_defringe(composite_im, role)
-
-# -------------------------------------------------------------
-# Stage 5: Eternal Ocean Royal Kingship / Queenship (Crowns & Gold)
-# -------------------------------------------------------------
-def make_stage5(base_im, role):
-    w, h = base_im.size
-    im = make_stage4(base_im, role)
-    crown_layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(crown_layer)
-
-    if role == 'candut':
-        draw.ellipse([670, 190, 760, 215], fill=(20, 25, 40, 80))
-
-        draw.polygon([
-            (675, 195), (715, 188), (755, 194), (752, 206), (715, 210), (673, 203)
-        ], fill=(255, 205, 50, 255))
-        draw.line([
-            (675, 195), (715, 188), (755, 194), (752, 206), (715, 210), (673, 203), (675, 195)
-        ], fill=(160, 110, 20, 255), width=3)
-
-        crown_points = [
-            (676, 195), (665, 140), (688, 168),
-            (715, 118),
-            (742, 168), (765, 140), (754, 194)
-        ]
-        draw.polygon(crown_points, fill=(255, 220, 65, 255))
-        draw.line(crown_points, fill=(160, 110, 20, 255), width=3)
-
-        draw.polygon([(715, 122), (710, 188), (720, 188)], fill=(255, 245, 150, 255))
-        for tx, ty in [(665, 140), (715, 118), (765, 140)]:
-            draw.ellipse([tx - 5, ty - 5, tx + 5, ty + 5], fill=(255, 245, 180, 255), outline=(160, 110, 20, 255), width=2)
-
-        draw.polygon([(715, 148), (706, 164), (715, 180), (724, 164)], fill=(30, 120, 255, 255), outline=(10, 50, 140, 255), width=2)
-        draw.polygon([(715, 150), (709, 162), (715, 166)], fill=(160, 215, 255, 255))
-
-    else:
-        draw.ellipse([670, 192, 760, 215], fill=(40, 15, 25, 80))
-        draw.arc([670, 180, 760, 215], start=0, end=180, fill=(255, 215, 60, 255), width=4)
-
-        tiara_points = [
-            (675, 194), (672, 162), (692, 172),
-            (715, 128),
-            (738, 172), (758, 162), (755, 194)
-        ]
-        draw.polygon(tiara_points, fill=(255, 225, 80, 255))
-        draw.line(tiara_points, fill=(180, 120, 25, 255), width=3)
-
-        for tx, ty in [(672, 162), (715, 128), (758, 162)]:
-            draw.ellipse([tx - 4, ty - 4, tx + 4, ty + 4], fill=(255, 255, 255, 255), outline=(180, 120, 25, 255), width=2)
-
-        draw.polygon([
-            (715, 150), (707, 164), (715, 178), (723, 164)
-        ], fill=(240, 30, 95, 255), outline=(140, 10, 50, 255), width=2)
-        draw.polygon([(715, 152), (709, 162), (715, 165)], fill=(255, 180, 210, 255))
-
-    crown_layer = crown_layer.filter(ImageFilter.GaussianBlur(0.35))
-    im.alpha_composite(crown_layer)
-
-    return clean_defringe(im, role)
+    solid_pct = np.sum(hd_final_alpha == 255) / np.sum(hd_final_alpha > 0) * 100
+    dark_edge_count = np.sum((hd_final_alpha > 10) & (hd_final_alpha < 240) & (np.mean(hd_crisp_rgb, axis=2) < 50))
+    print(f"Saved {fname:18s} -> HD ({hd_w}x{hd_h}): Solid={solid_pct:.1f}%, Dark edge pixels (<50)={dark_edge_count}")
 
 def main():
-    print("=== Processing New HD Sprites into public/fish ===")
-    repa_stage2 = get_clean_repa_stage2()
-    candut_stage2 = get_clean_candut_stage2(repa_stage2)
-
-    candut_stage1 = make_stage1(candut_stage2, 'candut')
-    repa_stage1 = make_stage1(repa_stage2, 'repa')
-
-    candut_stage3 = make_stage3_candut(candut_stage2)
-    repa_stage3 = make_stage3_repa(repa_stage2)
-
-    candut_stage4 = make_stage4(candut_stage2, 'candut')
-    repa_stage4 = make_stage4(repa_stage2, 'repa')
-
-    candut_stage5 = make_stage5(candut_stage2, 'candut')
-    repa_stage5 = make_stage5(repa_stage2, 'repa')
-
-    sprites = {
-        'candut_stage1.png': candut_stage1,
-        'repa_stage1.png': repa_stage1,
-        'candut_stage2.png': candut_stage2,
-        'repa_stage2.png': repa_stage2,
-        'candut_stage3.png': candut_stage3,
-        'repa_stage3.png': repa_stage3,
-        'candut_stage4.png': candut_stage4,
-        'repa_stage4.png': repa_stage4,
-        'candut_stage5.png': candut_stage5,
-        'repa_stage5.png': repa_stage5,
-    }
-
-    for name, img in sprites.items():
-        out_p = os.path.join(PUBLIC_DIR, name)
-        img.save(out_p)
-        print(f"Saved {name:18s} -> {out_p}")
+    print("=== Processing Original Fish Designs to True Clean HD ===")
+    for stage in range(1, 6):
+        for role in ['candut', 'repa']:
+            fname = f"{role}_stage{stage}.png"
+            process_single_fish(fname, role, stage)
+    print("=== All 10 original fish sprites processed to True Clean HD! ===")
 
 if __name__ == '__main__':
     main()
