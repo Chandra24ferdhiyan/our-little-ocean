@@ -190,7 +190,7 @@ export class SimFish {
       const bobY = Math.sin(this.finPhase) * 1.5;
 
       const stage = level >= 401 ? 5 : level >= 301 ? 4 : level >= 201 ? 3 : level >= 101 ? 2 : 1;
-      const rawW = stage === 5 ? 78 : stage === 4 ? 70 : stage === 3 ? 62 : stage === 2 ? 55 : 46;
+      const rawW = stage === 5 ? 78 : stage === 4 ? 70 : stage === 3 ? 62 : stage === 2 ? 55 : 38;
       const baseW = rawW * responsiveScale;
       const aspect = spriteImg.naturalWidth / spriteImg.naturalHeight;
       const baseH = baseW / aspect;

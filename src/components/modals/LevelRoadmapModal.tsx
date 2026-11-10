@@ -128,23 +128,27 @@ export function LevelRoadmapModal({ isOpen, onClose }: LevelRoadmapModalProps) {
                   <div className="mt-2.5 pt-2 border-t border-[#E2EAF0]/80 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center -space-x-1.5">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#CBD7DF] p-0.5 shadow-2xs">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#CBD7DF] p-0.5 shadow-2xs flex items-center justify-center overflow-hidden">
                           <img
-                            src={`/fish/candut_stage${m.stage}.png?v=2`}
+                            src={`/fish/candut_stage${m.stage}.png?v=3`}
                             alt={`Candut Tahap ${m.stage}`}
-                            className="w-full h-full object-contain"
+                            className={`w-full h-full object-contain transition-transform ${m.stage === 1 ? 'scale-[0.80]' : ''}`}
                           />
                         </div>
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#F3C5D1] p-0.5 shadow-2xs">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white border border-[#F3C5D1] p-0.5 shadow-2xs flex items-center justify-center overflow-hidden">
                           <img
-                            src={`/fish/repa_stage${m.stage}.png?v=2`}
+                            src={`/fish/repa_stage${m.stage}.png?v=3`}
                             alt={`Saridut Tahap ${m.stage}`}
-                            className="w-full h-full object-contain"
+                            className={`w-full h-full object-contain transition-transform ${m.stage === 1 ? 'scale-[0.80]' : ''}`}
                           />
                         </div>
                       </div>
                       <span className="text-[11px] font-medium text-[#526A7A]">
-                        Bentuk Candut &amp; Saridut Tahap {m.stage}
+                        {m.stage === 1
+                          ? 'Bentuk Bayi Mungil Tahap 1'
+                          : m.stage === 2
+                          ? 'Bentuk Remaja Bertumbuh Tahap 2'
+                          : `Bentuk Candut & Saridut Tahap ${m.stage}`}
                       </span>
                     </div>
                   </div>

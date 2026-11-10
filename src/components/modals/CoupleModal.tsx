@@ -68,11 +68,11 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
                 : 'bg-[#F8FAFC] border-[#E2EAF0]'
             }`}
           >
-            <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#CBD7DF] flex items-center justify-center shadow-2xs p-1.5">
+            <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#CBD7DF] flex items-center justify-center shadow-2xs p-1.5 overflow-hidden">
               <img
-                src={`/fish/candut_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png`}
+                src={`/fish/candut_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png?v=3`}
                 alt="Candut"
-                className="w-full h-full object-contain"
+                className={`w-full h-full object-contain transition-transform ${aquarium.current_level < 101 ? 'scale-[0.84]' : ''}`}
               />
             </div>
             <h4 className="font-serif text-base text-[#182C3A] mt-2 font-semibold">Candut</h4>
@@ -100,11 +100,11 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
                 : 'bg-[#F8FAFC] border-[#E2EAF0]'
             }`}
           >
-            <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#F3C5D1] flex items-center justify-center shadow-2xs p-1.5">
+            <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#F3C5D1] flex items-center justify-center shadow-2xs p-1.5 overflow-hidden">
               <img
-                src={`/fish/repa_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png`}
+                src={`/fish/repa_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png?v=3`}
                 alt="Saridut"
-                className="w-full h-full object-contain"
+                className={`w-full h-full object-contain transition-transform ${aquarium.current_level < 101 ? 'scale-[0.84]' : ''}`}
               />
             </div>
             <h4 className="font-serif text-base text-[#182C3A] mt-2 font-semibold">Saridut</h4>

@@ -9,7 +9,7 @@ export const LEVEL_MILESTONES: LevelMilestone[] = [
     description: 'Candut dan Saridut berukuran mungil dan lincah. Keduanya berenang berdampingan menjelajahi samudera cinta bersama.',
     badge: 'Tahap 1: Bayi Ikan',
     unlockedFeatures: [
-      'Bentuk sepasang ikan mungil dan lincah (Stage 1)',
+      'Bentuk sepasang bayi ikan mungil bulat & menggemaskan (Stage 1)',
       'Interaksi ketuk kaca akuarium & gelombang riak air',
       'Kirim surat gelembung cinta, pesan suara & kapsul waktu',
     ],
@@ -23,7 +23,7 @@ export const LEVEL_MILESTONES: LevelMilestone[] = [
     badge: 'Tahap 2: Tumbuh Bersama',
     unlockedFeatures: [
       'Lencana Mutiara Harmoni 100 & Hadiah +10 Pelet Emas',
-      'Evolusi fisik ikan remaja (Stage 2: ukuran bertumbuh +10%)',
+      'Evolusi fisik ikan remaja (Stage 2: ukuran bertumbuh +45% & sisik berkembang)',
       'Pola renang intim: Candut dan Saridut berenang sinkron berdekatan',
     ],
   },
