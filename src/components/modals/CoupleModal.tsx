@@ -70,7 +70,7 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
           >
             <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#CBD7DF] flex items-center justify-center shadow-2xs p-1.5 overflow-hidden">
               <img
-                src={`/fish/candut_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png?v=8`}
+                src={`/fish/candut stage ${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png?v=10`}
                 alt="Candut"
                 className={`w-full h-full object-contain transition-transform ${aquarium.current_level < 101 ? 'scale-[0.84]' : ''}`}
               />
@@ -102,7 +102,7 @@ export function CoupleModal({ isOpen, onClose }: CoupleModalProps) {
           >
             <div className="w-14 h-14 mx-auto rounded-xl bg-white border border-[#F3C5D1] flex items-center justify-center shadow-2xs p-1.5 overflow-hidden">
               <img
-                src={`/fish/repa_stage${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png?v=8`}
+                src={`/fish/saridut stage ${aquarium.current_level >= 401 ? 5 : aquarium.current_level >= 301 ? 4 : aquarium.current_level >= 201 ? 3 : aquarium.current_level >= 101 ? 2 : 1}.png?v=10`}
                 alt="Saridut"
                 className={`w-full h-full object-contain transition-transform ${aquarium.current_level < 101 ? 'scale-[0.84]' : ''}`}
               />

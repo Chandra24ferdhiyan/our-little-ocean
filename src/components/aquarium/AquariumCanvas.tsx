@@ -104,19 +104,19 @@ export function AquariumCanvas({ onTapLocation }: AquariumCanvasProps) {
       }
     });
 
-    // Preload all 5 evolutionary stages of Candut & Repa sprites with cache-busting version
+    // Preload all 5 evolutionary stages of Candut & Saridut sprites with cache-busting version
     for (let stage = 1; stage <= 5; stage++) {
       const cKey = `candut_${stage}`;
       if (!fishSpritesRef.current[cKey]) {
         const cImg = new Image();
-        cImg.src = `/fish/candut_stage${stage}.png?v=8`;
+        cImg.src = `/fish/candut stage ${stage}.png?v=10`;
         fishSpritesRef.current[cKey] = cImg;
       }
 
       const rKey = `repa_${stage}`;
       if (!fishSpritesRef.current[rKey]) {
         const rImg = new Image();
-        rImg.src = `/fish/repa_stage${stage}.png?v=8`;
+        rImg.src = `/fish/saridut stage ${stage}.png?v=10`;
         fishSpritesRef.current[rKey] = rImg;
       }
     }
